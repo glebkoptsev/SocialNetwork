@@ -6,6 +6,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["UserService.CacheWarmup/UserService.CacheWarmup.csproj", "UserService.CacheWarmup/"]
+COPY ["Libraries.NpgsqlService/Libraries.NpgsqlService.csproj", "Libraries.NpgsqlService/"]
 COPY ["UserService.Database/UserService.Database.csproj", "UserService.Database/"]
 RUN dotnet restore "./UserService.CacheWarmup/UserService.CacheWarmup.csproj"
 COPY . .

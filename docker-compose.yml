@@ -1,0 +1,137 @@
+name: socialnetwork-env
+
+networks:
+  main-network:
+    driver: bridge
+
+services:
+  user_service_api:
+    container_name: user_service_api
+    image: gkoptsev/user_service_api:latest
+    build:
+      context: .
+      dockerfile: UserService.API/Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - main-network
+    depends_on:
+      - user_service_postgres
+      - redis
+      - kafka
+    restart: always
+
+  user_service_postgres:
+    container_name: user_service_postgres
+    image: postgres:latest
+    command: -c 'max_connections=1000'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 7g0WfNsQziV5r5P
+      POSTGRES_DB: otushomework
+    ports:
+      - "5432:5432"
+    networks: 
+      - main-network
+    volumes:
+      - ./volumes/pgmaster:/var/lib/postgresql/data
+    restart: always
+    
+  user_service_postgres_slave_first:
+    container_name: user_service_postgres_slave_first
+    image: postgres:latest
+    command: -c 'max_connections=1000'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 7g0WfNsQziV5r5P
+      POSTGRES_DB: otushomework
+    ports:
+      - "5431:5432"
+    networks: 
+      - main-network
+    volumes:
+      - ./volumes/pgslave:/var/lib/postgresql/data
+    restart: always 
+
+  user_service_postgres_slave_second:
+    container_name: user_service_postgres_slave_second
+    image: postgres:latest
+    command: -c 'max_connections=1000'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 7g0WfNsQziV5r5P
+      POSTGRES_DB: otushomework
+    ports:
+      - "5430:5432"
+    networks: 
+      - main-network
+    volumes:
+      - ./volumes/pgslave_sec:/var/lib/postgresql/data
+    restart: always      
+
+  redis:
+    image: redis:7.4.0
+    container_name: user_service_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./volumes/redisdata:/data
+    networks:
+      - main-network
+    restart: always
+    
+  user_service_cache_warmup:
+    container_name: user_service_cache_warmup
+    image: gkoptsev/user_service_cache_warmup:latest
+    build:
+      context: .
+      dockerfile: UserService.CacheWarmup/Dockerfile
+    networks:
+      - main-network
+    depends_on:
+      - user_service_postgres
+      - redis
+
+  user_service_cache_update_service:
+    container_name: user_service_cache_update_service
+    image: gkoptsev/user_service_cache_update_service:latest
+    build:
+      context: .
+      dockerfile: UserService.CacheUpdateService/Dockerfile
+    networks:
+      - main-network
+    depends_on:
+      - user_service_postgres
+      - redis
+      - kafka
+    restart: always
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: user_service_zk
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - main-network
+    restart: always
+   
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: user_service_kafka
+    depends_on:
+      - zookeeper
+    networks:
+      - main-network
+    ports:
+      - 9092:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: INSIDE://kafka:9092,OUTSIDE://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
+      KAFKA_CREATE_TOPICS: feed-posts:1:1
+    restart: always

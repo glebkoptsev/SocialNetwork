@@ -33,12 +33,12 @@ namespace UserService.CacheUpdateService
                         await Task.Delay(2000, ct);
                         continue;
                     }
-                    Console.WriteLine($"Обработка сообщения {consumerResult.Message.Value}; Ключ {consumerResult.Message.Key}");
+                    Console.WriteLine($"РћР±СЂР°Р±РѕС‚РєР° СЃРѕРѕР±С‰РµРЅРёСЏ {consumerResult.Message.Value}; РљР»СЋС‡ {consumerResult.Message.Key}");
 
                     var message = JsonSerializer.Deserialize<FeedUpdateMessage>(consumerResult.Message.Value, jsonOptions)!;
                     if (message.ActionType == ActionTypeEnum.FullReload)
                     {
-                        Console.WriteLine($"Инициирована перезагрузка кеша");
+                        Console.WriteLine($"РРЅРёС†РёРёСЂРѕРІР°РЅР° РїРµСЂРµР·Р°РіСЂСѓР·РєР° РєРµС€Р°");
                         await ReloadFeedAsync(Guid.Parse(consumerResult.Message.Key), $"feed-{consumerResult.Message.Key}", ct);
                     }
                     else
@@ -48,7 +48,7 @@ namespace UserService.CacheUpdateService
                         var friends_ids = await GetFriendsAsync(Guid.Parse(consumerResult.Message.Key));
                         foreach (var friend_id in friends_ids)
                         {
-                            Console.WriteLine($"Обработка друга {friend_id}");
+                            Console.WriteLine($"РћР±СЂР°Р±РѕС‚РєР° РґСЂСѓРіР° {friend_id}");
                             var key = $"feed-{friend_id}";
                             var cachedFeedJson = await cache.GetStringAsync(key, ct);
                             if (cachedFeedJson is null)
@@ -59,7 +59,7 @@ namespace UserService.CacheUpdateService
                             var cachedFeed = JsonSerializer.Deserialize<List<Post>>(cachedFeedJson, jsonOptions)!;
                             if (message.ActionType == ActionTypeEnum.Delete)
                             {
-                                Console.WriteLine($"Удаление поста {message.Post_id}");
+                                Console.WriteLine($"РЈРґР°Р»РµРЅРёРµ РїРѕСЃС‚Р° {message.Post_id}");
                                 var postForDelete = cachedFeed.FirstOrDefault(p => p.Post_id == message.Post_id);
                                 if (postForDelete != null)
                                 {
@@ -74,7 +74,7 @@ namespace UserService.CacheUpdateService
 
                             if (!cachedFeed.Any(f => f.Post_id == message.Post_id.Value) && message.ActionType == ActionTypeEnum.Create)
                             {
-                                Console.WriteLine($"Добавление поста {message.Post_id}");
+                                Console.WriteLine($"Р”РѕР±Р°РІР»РµРЅРёРµ РїРѕСЃС‚Р° {message.Post_id}");
                                 cachedFeed.Add(post);
                                 if (cachedFeed.Count > 1000)
                                 {
@@ -85,7 +85,7 @@ namespace UserService.CacheUpdateService
                             }
                             else if (cachedFeed.Any(f => f.Post_id == message.Post_id.Value) && message.ActionType == ActionTypeEnum.Update)
                             {
-                                Console.WriteLine($"Обновление поста {message.Post_id}");
+                                Console.WriteLine($"РћР±РЅРѕРІР»РµРЅРёРµ РїРѕСЃС‚Р° {message.Post_id}");
                                 var cachedPost = cachedFeed.First(p => p.Post_id == post.Post_id);
                                 cachedPost = post;
                                 await cache.SetStringAsync(key, JsonSerializer.Serialize(cachedFeed, jsonOptions), ct);
@@ -95,12 +95,14 @@ namespace UserService.CacheUpdateService
                     consumer.StoreOffset(consumerResult);
 
                 }
-                catch (TaskCanceledException)
-                {
-                    break;
-                }
                 catch (Exception e)
                 {
+                    if (e is TaskCanceledException || e is OperationCanceledException)
+                    {
+                        Console.WriteLine("shut down");
+                        break;
+                    }
+
                     Console.WriteLine(e.ToString());
                 }
             }
