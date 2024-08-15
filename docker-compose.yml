@@ -30,7 +30,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 7g0WfNsQziV5r5P
-      POSTGRES_DB: otushomework
+      POSTGRES_DB: userdb
     ports:
       - "5432:5432"
     networks: 
@@ -46,7 +46,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 7g0WfNsQziV5r5P
-      POSTGRES_DB: otushomework
+      POSTGRES_DB: userdb
     ports:
       - "5431:5432"
     networks: 
@@ -62,7 +62,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 7g0WfNsQziV5r5P
-      POSTGRES_DB: otushomework
+      POSTGRES_DB: userdb
     ports:
       - "5430:5432"
     networks: 
