@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UserSecretsId>dotnet-OtusHomework.CacheUpdateService-ad9405a2-45b7-4a31-b1bd-32e765d4e42a</UserSecretsId>
+		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.7" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Libraries.Kafka\Libraries.Kafka.csproj" />
+		<ProjectReference Include="..\Libraries.NpgsqlService\Libraries.NpgsqlService.csproj" />
+		<ProjectReference Include="..\UserService.Database\UserService.Database.csproj" />
+	</ItemGroup>
+</Project>
