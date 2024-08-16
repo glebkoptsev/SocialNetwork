@@ -151,3 +151,19 @@ services:
     volumes:
       - ./volumes/pgdialogs:/var/lib/postgresql/data
     restart: always
+    
+  dialog_service_api:
+    container_name: dialog_service_api
+    image: gkoptsev/dialog_service_api:latest
+    build:
+      context: .
+      dockerfile: DialogService.API/Dockerfile
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - main-network
+    depends_on:
+      - dialog_service_postgres
+    restart: always
