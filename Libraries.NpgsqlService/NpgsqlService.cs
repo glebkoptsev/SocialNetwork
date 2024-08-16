@@ -16,7 +16,7 @@ namespace Libraries.NpgsqlService
             var connectionString = configuration.GetConnectionString(connectionStringName)
                 ?? throw new Exception("connection string not found");
             Npgsql = new NpgsqlDataSourceBuilder(connectionString).BuildMultiHost();
-            CreateDbSchema();
+            //CreateDbSchema();
         }
 
         public void Dispose()

@@ -3,21 +3,27 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.10.35013.160
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.API", "UserService.API\UserService.API.csproj", "{0678F3B8-38F9-4AA4-9AF9-F15F78055384}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.API", "UserService.API\UserService.API.csproj", "{0678F3B8-38F9-4AA4-9AF9-F15F78055384}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Libraries.Kafka", "Libraries.Kafka\Libraries.Kafka.csproj", "{F7BDD17F-B1F3-41EF-8738-D126F68C59A4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Libraries.Kafka", "Libraries.Kafka\Libraries.Kafka.csproj", "{F7BDD17F-B1F3-41EF-8738-D126F68C59A4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Libraries.NpgsqlService", "Libraries.NpgsqlService\Libraries.NpgsqlService.csproj", "{A78C5B80-E803-4939-93CA-96AAA20DE8D9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Libraries.NpgsqlService", "Libraries.NpgsqlService\Libraries.NpgsqlService.csproj", "{A78C5B80-E803-4939-93CA-96AAA20DE8D9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.CacheWarmup", "UserService.CacheWarmup\UserService.CacheWarmup.csproj", "{6F6C4406-EF1A-4EA7-A5E1-94FD9BD87BB9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.CacheWarmup", "UserService.CacheWarmup\UserService.CacheWarmup.csproj", "{6F6C4406-EF1A-4EA7-A5E1-94FD9BD87BB9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.CacheUpdateService", "UserService.CacheUpdateService\UserService.CacheUpdateService.csproj", "{CB6B7018-2FDA-48A8-AB94-D0974BC4A2BC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.CacheUpdateService", "UserService.CacheUpdateService\UserService.CacheUpdateService.csproj", "{CB6B7018-2FDA-48A8-AB94-D0974BC4A2BC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.Database", "UserService.Database\UserService.Database.csproj", "{1010C8FA-1063-425B-9C4D-267AA8F46FF6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.Database", "UserService.Database\UserService.Database.csproj", "{1010C8FA-1063-425B-9C4D-267AA8F46FF6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.PostsGenerator", "UserService.PostsGenerator\UserService.PostsGenerator.csproj", "{6DDF379B-9BAE-46DA-A970-F88658028A83}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.PostsGenerator", "UserService.PostsGenerator\UserService.PostsGenerator.csproj", "{6DDF379B-9BAE-46DA-A970-F88658028A83}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserService.UsersGenerator", "UserService.UsersGenerator\UserService.UsersGenerator.csproj", "{43E86709-3E5E-45BB-A64F-C0945961B880}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.UsersGenerator", "UserService.UsersGenerator\UserService.UsersGenerator.csproj", "{43E86709-3E5E-45BB-A64F-C0945961B880}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DialogService.API", "DialogService.API\DialogService.API.csproj", "{6FAF78FE-D535-4E54-82C4-D276B29C355E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Libraries.Web.Common", "Libraries.Web.Common\Libraries.Web.Common.csproj", "{4DBEDA53-A8AA-4D8E-9E06-E66FC79A1B0A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DialogService.Database", "DialogService.Database\DialogService.Database.csproj", "{C2AB3C75-D512-4144-875F-B67940ABAAC7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -57,6 +63,18 @@ Global
 		{43E86709-3E5E-45BB-A64F-C0945961B880}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{43E86709-3E5E-45BB-A64F-C0945961B880}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{43E86709-3E5E-45BB-A64F-C0945961B880}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6FAF78FE-D535-4E54-82C4-D276B29C355E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6FAF78FE-D535-4E54-82C4-D276B29C355E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6FAF78FE-D535-4E54-82C4-D276B29C355E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6FAF78FE-D535-4E54-82C4-D276B29C355E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4DBEDA53-A8AA-4D8E-9E06-E66FC79A1B0A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4DBEDA53-A8AA-4D8E-9E06-E66FC79A1B0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4DBEDA53-A8AA-4D8E-9E06-E66FC79A1B0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4DBEDA53-A8AA-4D8E-9E06-E66FC79A1B0A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2AB3C75-D512-4144-875F-B67940ABAAC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C2AB3C75-D512-4144-875F-B67940ABAAC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C2AB3C75-D512-4144-875F-B67940ABAAC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C2AB3C75-D512-4144-875F-B67940ABAAC7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

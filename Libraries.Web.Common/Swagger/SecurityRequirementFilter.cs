@@ -2,7 +2,7 @@
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
-namespace UserService.API.Swagger
+namespace Libraries.Web.Common.Swagger
 {
     public class SecurityRequirementFilter(string apiRefIds) : IOperationFilter
     {

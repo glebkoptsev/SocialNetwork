@@ -135,3 +135,19 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_CREATE_TOPICS: feed-posts:1:1
     restart: always
+    
+  dialog_service_postgres:
+    container_name: dialog_service_postgres
+    image: postgres:16.4
+    command: -c 'max_connections=1000'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 7g0WfNsQziV5r5P
+      POSTGRES_DB: dialogdb
+    ports:
+      - "5433:5432"
+    networks: 
+      - main-network
+    volumes:
+      - ./volumes/pgdialogs:/var/lib/postgresql/data
+    restart: always

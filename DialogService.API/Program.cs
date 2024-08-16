@@ -1,15 +1,13 @@
-using Libraries.Kafka;
+using DialogService.API.Services;
 using Libraries.NpgsqlService;
+using Libraries.Web.Common.Settings;
+using Libraries.Web.Common.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
-using UserService.API.Services;
-using Libraries.Web.Common.Settings;
-using Libraries.Web.Common.Swagger;
-using UserService.Database;
 
-namespace UserService.API
+namespace DialogService.API
 {
     public class Program
     {
@@ -18,7 +16,6 @@ namespace UserService.API
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddOptions();
             builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
-            builder.Services.Configure<KafkaSettings>(builder.Configuration.GetSection("KafkaSettings"));
             builder.Services.AddAuthentication(o =>
             {
                 o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -58,21 +55,8 @@ namespace UserService.API
                 });
                 o.OperationFilter<SecurityRequirementFilter>(JwtBearerDefaults.AuthenticationScheme);
             });
-            builder.Services.AddStackExchangeRedisCache(options =>
-            {
-#if DEBUG
-                options.Configuration = builder.Configuration.GetConnectionString("redis_debug");
-#else
-                options.Configuration = builder.Configuration.GetConnectionString("redis");
-#endif
-            });
             builder.Services.AddSingleton<NpgsqlService>();
-            builder.Services.AddTransient<UsersService>();
-            builder.Services.AddTransient<FriendService>();
-            builder.Services.AddTransient<PostRepository>();
-            builder.Services.AddTransient<PostService>();
-            builder.Services.AddSingleton<KafkaClientHandle>();
-            builder.Services.AddSingleton<KafkaProducer<string, string>>();
+            builder.Services.AddTransient<ChatService>();
             var app = builder.Build();
             app.UseSwagger();
             app.UseSwaggerUI();

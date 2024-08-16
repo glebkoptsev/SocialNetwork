@@ -15,6 +15,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\Libraries.Kafka\Libraries.Kafka.csproj" />
 		<ProjectReference Include="..\Libraries.NpgsqlService\Libraries.NpgsqlService.csproj" />
+		<ProjectReference Include="..\Libraries.Web.Common\Libraries.Web.Common.csproj" />
 		<ProjectReference Include="..\UserService.Database\UserService.Database.csproj" />
 	</ItemGroup>
 

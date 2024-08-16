@@ -1,4 +1,5 @@
 using Libraries.NpgsqlService.Security;
+using Libraries.Web.Common.Settings;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -6,7 +7,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using UserService.API.DTOs;
 using UserService.API.Services;
-using UserService.API.Settings;
 
 namespace UserService.API.Controllers
 {
