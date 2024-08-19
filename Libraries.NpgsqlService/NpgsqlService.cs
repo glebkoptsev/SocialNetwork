@@ -16,7 +16,6 @@ namespace Libraries.NpgsqlService
             var connectionString = configuration.GetConnectionString(connectionStringName)
                 ?? throw new Exception("connection string not found");
             Npgsql = new NpgsqlDataSourceBuilder(connectionString).BuildMultiHost();
-            //CreateDbSchema();
         }
 
         public void Dispose()
@@ -62,43 +61,6 @@ namespace Libraries.NpgsqlService
                 result.Add(row);
             }
             return result;
-        }
-
-        private void CreateDbSchema()
-        {
-            var query = @"CREATE TABLE IF NOT EXISTS public.users
-                          (
-                              user_id uuid NOT NULL,
-                              first_name character varying(30) NOT NULL,
-                              second_name character varying(30) NOT NULL,
-                              birthdate character varying(11) NOT NULL,
-                              biography character varying(1000) NOT NULL,
-                              city character varying(255) NOT NULL,
-                              password character varying(255) NOT NULL,
-                              CONSTRAINT pk_users PRIMARY KEY (user_id)
-                          );
-                        CREATE INDEX IF NOT EXISTS users_fname_sname_idx ON public.users(first_name varchar_pattern_ops, second_name varchar_pattern_ops);
-                        CREATE TABLE IF NOT EXISTS public.friends 
-                        (
-	                        user_id uuid,
-	                        friend_id uuid,
-	                        PRIMARY KEY(user_id, friend_id),
-	                        FOREIGN KEY (user_id) REFERENCES users (user_id),
-	                        FOREIGN KEY (friend_id) REFERENCES users (user_id)
-                        );
-                        CREATE TABLE IF NOT EXISTS public.posts 
-                        (
-                            post_id uuid not null,
-	                        user_id uuid not null,
-	                        post varchar(2000) not null,
-                            creation_datetime timestamp not null default CURRENT_TIMESTAMP,
-	                        PRIMARY KEY(post_id),
-	                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                        );
-                        CREATE INDEX IF NOT EXISTS posts_userid_idx ON public.posts(user_id);";
-
-
-            ExecuteNonQueryAsync(query, []).Wait();
         }
     }
 }
