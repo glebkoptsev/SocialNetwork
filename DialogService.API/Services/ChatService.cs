@@ -88,6 +88,8 @@ namespace DialogService.API.Services
 
             query = @"INSERT INTO public.chat_users(chat_id, user_id)
 	                    VALUES (@Chat_id, @User_id)";
+            if (!request.Users_ids.Contains(creator_id))
+                request.Users_ids.Add(creator_id);
             foreach (var user_id in request.Users_ids)
             {
                 parameters =
