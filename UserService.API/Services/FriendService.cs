@@ -26,7 +26,7 @@ namespace UserService.API.Services
             var message = new Message<string, string>
             {
                 Key = user_id.ToString(),
-                Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.FullReload, null), Consts.JsonSerializerOptions),
+                Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.FullReload, null, user_id), Consts.JsonSerializerOptions),
                 Timestamp = Timestamp.Default
             };
             await kafkaProducer.ProduceAsync("feed-posts", message);
@@ -45,10 +45,29 @@ namespace UserService.API.Services
             var message = new Message<string, string>
             {
                 Key = user_id.ToString(),
-                Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.FullReload, null), Consts.JsonSerializerOptions),
+                Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.FullReload, null, user_id), Consts.JsonSerializerOptions),
                 Timestamp = Timestamp.Default
             };
             await kafkaProducer.ProduceAsync("feed-posts", message);
+        }
+
+        public async Task<List<Guid>> GetFriendsAsync(Guid user_id)
+        {
+            string query = @"select user_id from public.friends
+                             where friend_id = @Friend_id";
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("Friend_id", NpgsqlDbType.Uuid) { Value = user_id},
+            };
+            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["user_id"], TargetSessionAttributes.PreferStandby);
+            if (data.Count == 0) return [];
+            var posts = new List<Guid>();
+            foreach (var row in data)
+            {
+                posts.Add(Guid.Parse(row["user_id"].ToString()!));
+            }
+            return posts;
         }
     }
 }
