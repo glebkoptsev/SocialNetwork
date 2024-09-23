@@ -26,7 +26,7 @@ namespace UserService.API.Services
                 var message = new Message<string, string>
                 {
                     Key = friend.ToString(),
-                    Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.Create, post_id, user_id), Consts.JsonSerializerOptions),
+                    Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.Create, post_id, user_id, post), Consts.JsonSerializerOptions),
                     Timestamp = Timestamp.Default
                 };
                 await kafkaProducer.ProduceAsync("feed-posts", message);
@@ -43,7 +43,7 @@ namespace UserService.API.Services
                 var message = new Message<string, string>
                 {
                     Key = friend.ToString(),
-                    Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.Update, post_id, user_id), Consts.JsonSerializerOptions),
+                    Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.Update, post_id, user_id, post), Consts.JsonSerializerOptions),
                     Timestamp = Timestamp.Default
                 };
                 await kafkaProducer.ProduceAsync("feed-posts", message);
@@ -59,7 +59,7 @@ namespace UserService.API.Services
                 var message = new Message<string, string>
                 {
                     Key = friend.ToString(),
-                    Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.Delete, post_id, user_id), Consts.JsonSerializerOptions),
+                    Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.Delete, post_id, user_id, null), Consts.JsonSerializerOptions),
                     Timestamp = Timestamp.Default
                 };
                 await kafkaProducer.ProduceAsync("feed-posts", message);

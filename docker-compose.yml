@@ -92,6 +92,8 @@ services:
       - main-network
     depends_on:
       - user_service_postgres
+      - user_service_postgres_slave_second
+      - user_service_postgres_slave_first
       - redis
 
   user_service_cache_update_service:
@@ -107,6 +109,7 @@ services:
       - redis
       - kafka
       - live_feed_service
+      - user_service_api
     restart: always
 
   zookeeper:

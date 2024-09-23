@@ -1,24 +1,31 @@
-﻿using Microsoft.AspNetCore.SignalR.Client;
+﻿using Libraries.Clients.Common;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace UserService.FeedClient
 {
     internal class Program
     {
-        static async Task Main()
+        static async Task Main(string[] args)
         {
-            await using var connection = new HubConnectionBuilder()
-                .WithUrl("http://localhost:5125/post/feed/posted", x => x.AccessTokenProvider = async ()
-                        => await Task.FromResult("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiIxMmIyN2M1YS1iM2ZkLTRjM2ItYjA3NC1hOGU2NDNjOTEwYjIiLCJ1bmlxdWVfbmFtZSI6InN0cmluZyIsIm5iZiI6MTcyNjc3Njk1MCwiZXhwIjoxNzI2ODYzMzUwLCJpYXQiOjE3MjY3NzY5NTAsImlzcyI6ImlzcyIsImF1ZCI6ImF1ZCJ9.4SWG4Q04cG1oAVRxdq0ZUK_SfrMiiPz-jHGa7rVbEHM"))
-                .WithAutomaticReconnect()
-                .Build();
+            var app = CreateHostBuilder(args);
+            using var scope = app.Services.CreateScope();
+            var feedClientSrv = scope.ServiceProvider.GetRequiredService<FeedClientSrv>();
+            await feedClientSrv.WorkAsync();
+        }
 
-            connection.On<string>("Receive", (message) =>
-            {
-                Console.WriteLine(message);
-            });
-            await connection.StartAsync();
-            Console.Read();
-            Console.WriteLine("end");
+        public static IHost CreateHostBuilder(string[] args)
+        {
+            return Host.CreateDefaultBuilder(args)
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddOptions();
+                    services.Configure<UserAuthServiceOptions>(hostContext.Configuration.GetSection("AuthService"));
+                    services.AddHttpClient<UserAuthService>();
+                    services.AddScoped<UserAuthService>();
+                    services.AddScoped<FeedClientSrv>();
+                }).Build();
         }
     }
 }
