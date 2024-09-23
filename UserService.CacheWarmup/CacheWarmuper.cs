@@ -5,7 +5,7 @@ using NpgsqlTypes;
 using System.Text.Json;
 using UserService.Database.Entities;
 
-namespace UserService.СacheWarmup
+namespace UserService.CacheWarmup
 {
     internal class CacheWarmuper(NpgsqlService npgsql, IDistributedCache distributedCache)
     {
@@ -88,6 +88,7 @@ namespace UserService.СacheWarmup
                               biography character varying(1000) NOT NULL,
                               city character varying(255) NOT NULL,
                               password character varying(255) NOT NULL,
+                              can_publish_messages bool null,
                               CONSTRAINT pk_users PRIMARY KEY (user_id)
                           );
                         CREATE INDEX IF NOT EXISTS users_fname_sname_idx ON public.users(first_name varchar_pattern_ops, second_name varchar_pattern_ops);

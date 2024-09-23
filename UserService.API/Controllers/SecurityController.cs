@@ -39,6 +39,7 @@ namespace UserService.API.Controllers
             var claims = new ClaimsIdentity();
             claims.AddClaim(new(ClaimTypes.NameIdentifier, user.User_id.ToString()));
             claims.AddClaim(new(ClaimTypes.Name, user.First_name));
+            claims.AddClaim(new("can_publish_messages", user.CanPublishMessages?.ToString() ?? bool.FalseString));
 
             var expire = options.Value.TokenExpireSeconds;
             var tokenDescriptor = new SecurityTokenDescriptor

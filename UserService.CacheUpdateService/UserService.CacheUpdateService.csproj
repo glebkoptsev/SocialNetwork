@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Worker">
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -9,12 +9,14 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.8" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.7" />
 	</ItemGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\Libraries.Clients.Common\Libraries.Clients.Common.csproj" />
 		<ProjectReference Include="..\Libraries.Kafka\Libraries.Kafka.csproj" />
 		<ProjectReference Include="..\Libraries.NpgsqlService\Libraries.NpgsqlService.csproj" />
 		<ProjectReference Include="..\UserService.Database\UserService.Database.csproj" />

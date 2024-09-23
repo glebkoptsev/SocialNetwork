@@ -1,24 +1,41 @@
 using Confluent.Kafka;
 using Libraries.Kafka.DTOs;
 using Libraries.Kafka;
-using Libraries.NpgsqlService;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using UserService.Database.Entities;
 using UserService.Database;
+using Microsoft.AspNetCore.SignalR.Client;
+using Libraries.Clients.Common;
 
 namespace UserService.CacheUpdateService
 {
-    public class Worker(IOptions<KafkaSettings> options, NpgsqlService npgsql, IDistributedCache cache, PostRepository postRepository) : BackgroundService
+    public class Worker(IOptions<KafkaSettings> options, 
+        IDistributedCache cache, 
+        PostRepository postRepository, 
+        IConfiguration configuration,
+        UserAuthService userAuthService) : BackgroundService
     {
         private readonly IOptions<KafkaSettings> options = options;
-        private readonly NpgsqlService npgsql = npgsql;
         private readonly IDistributedCache cache = cache;
+        private readonly UserAuthService userAuthService = userAuthService;
         private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
+
+#if DEBUG
+        private readonly string signalrHost = configuration["LiveFeedService:URL_Debug"]!;
+#else
+        private readonly string signalrHost = configuration["LiveFeedService:URL"]!;
+#endif
 
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
+            await using var connection = new HubConnectionBuilder()
+                .WithUrl(signalrHost, x => x.AccessTokenProvider = async () => 
+                    await userAuthService.GetTokenAsync())
+                .Build();
+            await connection.StartAsync(ct);
+            //await connection.InvokeAsync("Send", $"hello world {i}", "12b27c5a-b3fd-4c3b-b074-a8e643c910b2", ct);
             using var consumer = new ConsumerBuilder<string, string>(GetConsumerConfig()).Build();
             consumer.Subscribe("feed-posts");
             while (!ct.IsCancellationRequested)
@@ -40,6 +57,10 @@ namespace UserService.CacheUpdateService
                         await ReloadFeedAsync(message.Author_id, $"feed-{consumerResult.Message.Key}", ct);
                         consumer.StoreOffset(consumerResult);
                         continue;
+                    }
+                    else
+                    {
+                        await connection.InvokeAsync("Send", consumerResult.Message.Value, consumerResult.Message.Key, ct);
                     }
 
                     var user_id = Guid.Parse(consumerResult.Message.Key);

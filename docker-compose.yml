@@ -106,6 +106,7 @@ services:
       - user_service_postgres
       - redis
       - kafka
+      - live_feed_service
     restart: always
 
   zookeeper:
@@ -150,7 +151,21 @@ services:
       - main-network
     depends_on:
       - dialog_service_postgres_master
-    restart: always    
+    restart: always  
+
+  live_feed_service:
+    container_name: live_feed_service
+    image: gkoptsev/live_feed_service:latest
+    build:
+      context: .
+      dockerfile: UserService.LiveFeedService/Dockerfile
+    ports:
+      - "5002:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - main-network
+    restart: always     
    
   dialog_service_postgres_master:
     container_name: dialog_service_postgres_master

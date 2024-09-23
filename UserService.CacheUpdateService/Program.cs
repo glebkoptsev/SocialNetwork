@@ -1,3 +1,4 @@
+using Libraries.Clients.Common;
 using Libraries.Kafka;
 using Libraries.NpgsqlService;
 using UserService.Database;
@@ -14,7 +15,9 @@ namespace UserService.CacheUpdateService
                 {
                     services.AddOptions();
                     services.Configure<KafkaSettings>(hostContext.Configuration.GetSection("KafkaSettings"));
+                    services.Configure<UserAuthServiceOptions>(hostContext.Configuration.GetSection("AuthService"));
                     services.AddSingleton<NpgsqlService>();
+                    services.AddSingleton<UserAuthService>();
                     services.AddTransient<PostRepository>();
                     services.AddStackExchangeRedisCache(options =>
                     {
