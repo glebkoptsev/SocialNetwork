@@ -9,6 +9,7 @@ COPY ["UserService.CacheUpdateService/UserService.CacheUpdateService.csproj", "U
 COPY ["UserService.Database/UserService.Database.csproj", "UserService.Database/"]
 COPY ["Libraries.Kafka/Libraries.Kafka.csproj", "Libraries.Kafka/"]
 COPY ["Libraries.NpgsqlService/Libraries.NpgsqlService.csproj", "Libraries.NpgsqlService/"]
+COPY ["Libraries.Clients.Common/Libraries.Clients.Common.csproj", "Libraries.Clients.Common/"]
 RUN dotnet restore "./UserService.CacheUpdateService/UserService.CacheUpdateService.csproj"
 COPY . .
 WORKDIR "/src/UserService.CacheUpdateService"
