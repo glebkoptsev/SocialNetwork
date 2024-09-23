@@ -96,6 +96,18 @@ services:
       - user_service_postgres_slave_first
       - redis
 
+  user_service_feed_client:
+    container_name: user_service_feed_client
+    image: gkoptsev/user_service_feed_client:latest
+    build:
+      context: .
+      dockerfile: UserService.FeedClient/Dockerfile
+    networks:
+      - main-network
+    depends_on:
+      - live_feed_service
+      - user_service_api
+    
   user_service_cache_update_service:
     container_name: user_service_cache_update_service
     image: gkoptsev/user_service_cache_update_service:latest

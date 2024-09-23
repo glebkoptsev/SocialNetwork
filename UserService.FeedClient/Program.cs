@@ -1,5 +1,4 @@
 ﻿using Libraries.Clients.Common;
-using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -10,21 +9,20 @@ namespace UserService.FeedClient
         static async Task Main(string[] args)
         {
             var app = CreateHostBuilder(args);
-            using var scope = app.Services.CreateScope();
-            var feedClientSrv = scope.ServiceProvider.GetRequiredService<FeedClientSrv>();
-            await feedClientSrv.WorkAsync();
+            await app.RunAsync();
         }
 
         public static IHost CreateHostBuilder(string[] args)
         {
             return Host.CreateDefaultBuilder(args)
+                .UseSystemd()
                 .ConfigureServices((hostContext, services) =>
                 {
                     services.AddOptions();
                     services.Configure<UserAuthServiceOptions>(hostContext.Configuration.GetSection("AuthService"));
                     services.AddHttpClient<UserAuthService>();
                     services.AddScoped<UserAuthService>();
-                    services.AddScoped<FeedClientSrv>();
+                    services.AddHostedService<FeedClientSrv>();
                 }).Build();
         }
     }

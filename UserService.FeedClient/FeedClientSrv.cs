@@ -1,10 +1,11 @@
 ﻿using Libraries.Clients.Common;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace UserService.FeedClient
 {
-    public class FeedClientSrv(UserAuthService userAuthService, IConfiguration configuration)
+    public class FeedClientSrv(UserAuthService userAuthService, IConfiguration configuration) : BackgroundService
     {
         private readonly UserAuthService userAuthService = userAuthService;
 #if DEBUG
@@ -13,21 +14,23 @@ namespace UserService.FeedClient
         private readonly string signalrHost = configuration["LiveFeedService:URL"]!;
 #endif
 
-        public async Task WorkAsync()
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            await using var connection = new HubConnectionBuilder()
-                .WithUrl(signalrHost, x => x.AccessTokenProvider = async ()
-                        => await userAuthService.GetTokenAsync())
-                .WithAutomaticReconnect()
-                .Build();
-
-            connection.On<string>("Receive", (message) =>
+            while (!stoppingToken.IsCancellationRequested) 
             {
-                Console.WriteLine(message);
-            });
-            await connection.StartAsync();
-            Console.Read();
-            Console.WriteLine("end");
+                await using var connection = new HubConnectionBuilder()
+                    .WithUrl(signalrHost, x => x.AccessTokenProvider = async ()
+                            => await userAuthService.GetTokenAsync())
+                    .WithAutomaticReconnect()
+                    .Build();
+
+                connection.On<string>("Receive", (message) =>
+                {
+                    Console.WriteLine(message);
+                });
+                await connection.StartAsync(stoppingToken);
+                await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
+            }
         }
     }
 }
