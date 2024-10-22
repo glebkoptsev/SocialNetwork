@@ -62,14 +62,14 @@ namespace DialogService.API.Services
                 };
             await npgsqlService.ExecuteNonQueryAsync(query, parameters);
 
-            query = @"UPDATE public.chats
-                      SET last_update_datetime = CURRENT_TIMESTAMP
-                      WHERE chat_id = @Chat_id";
-            parameters =
-                [
-                   new("Chat_id", NpgsqlDbType.Uuid) { Value = chat_id }
-                ];
-            await npgsqlService.ExecuteNonQueryAsync(query, parameters);
+            //query = @"UPDATE public.chats
+            //          SET last_update_datetime = CURRENT_TIMESTAMP
+            //          WHERE chat_id = @Chat_id";
+            //parameters =
+            //    [
+            //       new("Chat_id", NpgsqlDbType.Uuid) { Value = chat_id }
+            //    ];
+            //await npgsqlService.ExecuteNonQueryAsync(query, parameters);
             return msg_id;
         }
 
