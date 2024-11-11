@@ -44,8 +44,7 @@ namespace DialogService.API.Services
                 Chat_id = chat.Id,
                 Chat_name = chat.Name,
                 Creation_datetime = chat.Created_at,
-                Creator_id = creator_id,
-                LastUpdate_datetime = chat.Created_at
+                Creator_id = creator_id
             };
 
             foreach (var user_id in request.Users_ids)
@@ -76,14 +75,15 @@ namespace DialogService.API.Services
             var db = redis.GetDatabase(0);
             var user_chats_res = await db.ExecuteAsync("FCALL", "get_something", 1, $"chat-{chat_id}");
             var user_chat = JsonSerializer.Deserialize<RedisChat>(user_chats_res.ToString(), jsonOptions);
-            return user_chat!.Messages.Select(m => new MessageEntity 
-            { 
-                Chat_id = chat_id,
-                Creation_datetime = m.Created_at,
-                Message = m.Text,
-                User_id = m.User_id,
-                Message_id = m.Message_id
-            }).ToArray();
+            return user_chat!.Messages.OrderByDescending(m => m.Created_at).Skip(offset).Take(limit)
+                .Select(m => new MessageEntity 
+                { 
+                    Chat_id = chat_id,
+                    Creation_datetime = m.Created_at,
+                    Message = m.Text,
+                    User_id = m.User_id,
+                    Message_id = m.Message_id
+                }).ToArray();
         }
 
         public async Task<List<Chat>> GetUserChatListAsync(Guid user_id, int limit, int offset)
@@ -91,7 +91,7 @@ namespace DialogService.API.Services
             var db = redis.GetDatabase(0);
             var user_chats_res = await db.ExecuteAsync("FCALL", "get_something", 1, $"user_chats-{user_id}");
             var user_chats = JsonSerializer.Deserialize<RedisUserChats>(user_chats_res.ToString(), jsonOptions);
-            return user_chats!.Chats;
+            return user_chats!.Chats.OrderByDescending(m => m.Creation_datetime).Skip(offset).Take(limit).ToList();
         }
 
         public async Task<Guid> SendMessageToChatAsync(Guid chat_id, SendMessageRequest request, Guid creator_id)
