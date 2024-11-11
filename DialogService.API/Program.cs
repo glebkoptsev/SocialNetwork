@@ -56,17 +56,8 @@ namespace DialogService.API
                 o.OperationFilter<SecurityRequirementFilter>(JwtBearerDefaults.AuthenticationScheme);
             });
 
-//            builder.Services.AddStackExchangeRedisCache(options =>
-//            {
-//#if DEBUG
-//                options.Configuration = builder.Configuration.GetConnectionString("redis_debug");
-//#else
-//                options.Configuration = builder.Configuration.GetConnectionString("redis");
-//#endif
-//            });
-
             builder.Services.AddSingleton<NpgsqlService>();
-            builder.Services.AddSingleton<ChatService>();
+            builder.Services.AddSingleton<IChatService, RedisChatService>();
             var app = builder.Build();
             app.UseSwagger();
             app.UseSwaggerUI();
