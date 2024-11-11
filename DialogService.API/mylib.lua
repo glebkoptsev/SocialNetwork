@@ -11,3 +11,5 @@ end
 
 redis.register_function('create_something', create_something)
 redis.register_function('get_something', get_something)
+
+--cat mylib.lua | redis-cli -x FUNCTION LOAD REPLACE
