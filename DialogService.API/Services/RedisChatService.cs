@@ -98,7 +98,7 @@ namespace DialogService.API.Services
         {
             var db = redis.GetDatabase(0);
             var chat_res = await db.ExecuteAsync("FCALL", "get_something", 1, $"chat-{chat_id}");
-            var chat = JsonSerializer.Deserialize<RedisChat>(chat_res.ToString())!;
+            var chat = JsonSerializer.Deserialize<RedisChat>(chat_res.ToString(), jsonOptions)!;
             var msg = new RedisChatMessage
             {
                 Created_at = DateTime.Now,
