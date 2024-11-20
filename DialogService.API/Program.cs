@@ -1,5 +1,7 @@
 using DialogService.API.Services;
 using Libraries.NpgsqlService;
+using Libraries.Web.Common.Clients;
+using Libraries.Web.Common.Middlewares;
 using Libraries.Web.Common.Settings;
 using Libraries.Web.Common.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -56,9 +58,12 @@ namespace DialogService.API
                 o.OperationFilter<SecurityRequirementFilter>(JwtBearerDefaults.AuthenticationScheme);
             });
 
+            builder.Services.AddHttpClient<UserServiceClient>();
+            builder.Services.AddTransient<UserServiceClient>();
             builder.Services.AddSingleton<NpgsqlService>();
             builder.Services.AddSingleton<IChatService, RedisChatService>();
             var app = builder.Build();
+            app.UseMiddleware<RequestLoggingMiddleware>();
             app.UseSwagger();
             app.UseSwaggerUI();
             app.UseAuthentication();

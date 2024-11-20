@@ -1,14 +1,16 @@
 ﻿using DialogService.API.DTOs;
 using DialogService.Database.Entities;
 using Libraries.NpgsqlService;
+using Libraries.Web.Common.Clients;
 using Npgsql;
 using NpgsqlTypes;
 
 namespace DialogService.API.Services
 {
-    public class ChatService(NpgsqlService npgsqlService) : IChatService
+    public class ChatService(NpgsqlService npgsqlService, UserServiceClient userService) : IChatService
     {
         private readonly NpgsqlService npgsqlService = npgsqlService;
+        private readonly UserServiceClient userService = userService;
 
         public async Task<MessageEntity[]> GetChatAsync(Guid chat_id, int limit, int offset, Guid user_id)
         {
@@ -92,6 +94,8 @@ namespace DialogService.API.Services
                 request.Users_ids.Add(creator_id);
             foreach (var user_id in request.Users_ids)
             {
+                var remoteUser = await userService.GetUserAsync(user_id);
+                if (remoteUser is null) continue;
                 parameters =
                 [
                    new("Chat_id", NpgsqlDbType.Uuid) { Value = chat_id },

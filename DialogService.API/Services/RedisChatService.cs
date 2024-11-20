@@ -1,8 +1,7 @@
 ﻿using DialogService.API.DTOs;
 using DialogService.Database.Entities;
+using Libraries.Web.Common.Clients;
 using StackExchange.Redis;
-using System;
-using System.Diagnostics;
 using System.Text.Json;
 
 namespace DialogService.API.Services
@@ -11,8 +10,9 @@ namespace DialogService.API.Services
     {
         private readonly ConnectionMultiplexer redis;
         private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
+        private readonly UserServiceClient userService;
 
-        public RedisChatService(IConfiguration configuration)
+        public RedisChatService(IConfiguration configuration, UserServiceClient userService)
         {
 #if DEBUG
             var connectionString = configuration.GetConnectionString("redis_debug")!;
@@ -20,6 +20,7 @@ namespace DialogService.API.Services
             var connectionString = configuration.GetConnectionString("redis")!;
 #endif
             redis = ConnectionMultiplexer.Connect(connectionString);
+            this.userService = userService;
         }
 
         public async Task<Guid> CreateChatAsync(CreateChatRequest request, Guid creator_id)
@@ -49,6 +50,8 @@ namespace DialogService.API.Services
 
             foreach (var user_id in request.Users_ids)
             {
+                var remoteUser = await userService.GetUserAsync(user_id);
+                if (remoteUser is null) continue;
                 var user_chats_res = await db.ExecuteAsync("FCALL", "get_something", 1, $"user_chats-{user_id}");
                 var user_chats_str = user_chats_res.ToString();
 

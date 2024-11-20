@@ -8,6 +8,7 @@ using UserService.API.Services;
 using Libraries.Web.Common.Settings;
 using Libraries.Web.Common.Swagger;
 using UserService.Database;
+using Libraries.Web.Common.Middlewares;
 
 namespace UserService.API
 {
@@ -74,6 +75,7 @@ namespace UserService.API
             builder.Services.AddSingleton<KafkaClientHandle>();
             builder.Services.AddSingleton<KafkaProducer<string, string>>();
             var app = builder.Build();
+            app.UseMiddleware<RequestLoggingMiddleware>();
             app.UseSwagger();
             app.UseSwaggerUI();
             app.UseAuthentication();
