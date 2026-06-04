@@ -1,16 +1,18 @@
 using Libraries.Kafka;
 using Libraries.NpgsqlService;
+using Libraries.Web.Common.Caching;
+using Libraries.Web.Common.Middlewares;
+using Libraries.Web.Common.Settings;
+using Libraries.Web.Common.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
 using System.Threading.RateLimiting;
 using UserService.API.Services;
-using Libraries.Web.Common.Settings;
-using Libraries.Web.Common.Swagger;
 using UserService.Database;
-using Libraries.Web.Common.Middlewares;
 
 namespace UserService.API
 {
@@ -83,6 +85,12 @@ namespace UserService.API
 #endif
             });
             builder.Services.AddSingleton<INpgsqlService, NpgsqlService>();
+            builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+            {
+                var connStr = builder.Configuration.GetConnectionString("redis");
+                return ConnectionMultiplexer.Connect(connStr!);
+            });
+            builder.Services.AddSingleton<IDistributedLock, RedisLock>();
             builder.Services.AddTransient<UsersService>();
             builder.Services.AddTransient<IFriendService, FriendService>();
             builder.Services.AddTransient<IPostRepository, PostRepository>();

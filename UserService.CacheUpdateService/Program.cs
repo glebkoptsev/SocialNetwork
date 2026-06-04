@@ -1,6 +1,8 @@
 using Libraries.Clients.Common;
 using Libraries.Kafka;
 using Libraries.NpgsqlService;
+using Libraries.Web.Common.Caching;
+using StackExchange.Redis;
 using UserService.Database;
 
 namespace UserService.CacheUpdateService
@@ -18,6 +20,12 @@ namespace UserService.CacheUpdateService
                     services.Configure<UserAuthServiceOptions>(hostContext.Configuration.GetSection("AuthService"));
                     services.AddSingleton<INpgsqlService, NpgsqlService>();
                     services.AddSingleton<IFeedOutboxStore, FeedOutboxStore>();
+                    services.AddSingleton<IConnectionMultiplexer>(_ =>
+                    {
+                        var connStr = hostContext.Configuration.GetConnectionString("redis");
+                        return ConnectionMultiplexer.Connect(connStr!);
+                    });
+                    services.AddSingleton<IDistributedLock, RedisLock>();
                     services.AddSingleton<IKafkaProducer, KafkaProducer<string, string>>();
                     services.AddSingleton<KafkaClientHandle>();
                     services.AddHttpClient<UserAuthService>();

@@ -1,6 +1,7 @@
 using Confluent.Kafka;
 using Libraries.Kafka.DTOs;
 using Libraries.Kafka;
+using Libraries.Web.Common.Caching;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -15,7 +16,8 @@ namespace UserService.CacheUpdateService
         IDistributedCache cache, 
         PostRepository postRepository, 
         IConfiguration configuration,
-        UserAuthService userAuthService) : BackgroundService
+        UserAuthService userAuthService,
+        IDistributedLock distributedLock) : BackgroundService
     {
         private readonly IOptions<KafkaSettings> options = options;
         private readonly IDistributedCache cache = cache;
@@ -68,45 +70,48 @@ namespace UserService.CacheUpdateService
                         throw new Exception($"Invalid message with actiontype = {message.ActionType} and post_id = null");
                     Console.WriteLine($"Обработка юзера {user_id}");
                     var key = $"feed-{user_id}";
-                    var cachedFeedJson = await cache.GetStringAsync(key, ct);
-                    if (cachedFeedJson is null)
-                    {
-                        await ReloadFeedAsync(user_id, key, ct);
-                        continue;
-                    }
-                    var cachedFeed = JsonSerializer.Deserialize<List<Post>>(cachedFeedJson, jsonOptions)!;
+
                     if (message.ActionType == ActionTypeEnum.Delete)
                     {
-                        Console.WriteLine($"Удаление поста {message.Post_id}");
-                        var postForDelete = cachedFeed.FirstOrDefault(p => p.Post_id == message.Post_id);
-                        if (postForDelete != null)
+                        await ModifyCacheAsync(key, async (cached, _) =>
                         {
-                            cachedFeed.Remove(postForDelete);
-                            await cache.SetStringAsync(key, JsonSerializer.Serialize(cachedFeed, jsonOptions), ct);
-                        }
-                        continue;
+                            Console.WriteLine($"Удаление поста {message.Post_id}");
+                            cached.RemoveAll(p => p.Post_id == message.Post_id);
+                            return cached.Count > 0 ? cached : null;
+                        }, ct);
                     }
-
-                    var post = await postRepository.GetPostAsync(message.Post_id.Value)
-                        ?? throw new Exception($"post {message.Post_id.Value} not found in db");
-
-                    if (!cachedFeed.Any(f => f.Post_id == message.Post_id.Value) && message.ActionType == ActionTypeEnum.Create)
+                    else
                     {
-                        Console.WriteLine($"Добавление поста {message.Post_id}");
-                        cachedFeed.Add(post);
-                        if (cachedFeed.Count > 1000)
+                        var post = await postRepository.GetPostAsync(message.Post_id.Value)
+                            ?? throw new Exception($"post {message.Post_id.Value} not found in db");
+
+                        await ModifyCacheAsync(key, async (cached, _) =>
                         {
-                            var oldestPost = cachedFeed.MinBy(f => f.Creation_datetime)!;
-                            cachedFeed.Remove(oldestPost);
-                        }
-                        await cache.SetStringAsync(key, JsonSerializer.Serialize(cachedFeed, jsonOptions), ct);
-                    }
-                    else if (cachedFeed.Any(f => f.Post_id == message.Post_id.Value) && message.ActionType == ActionTypeEnum.Update)
-                    {
-                        Console.WriteLine($"Обновление поста {message.Post_id}");
-                        var cachedPost = cachedFeed.First(p => p.Post_id == post.Post_id);
-                        cachedPost = post;
-                        await cache.SetStringAsync(key, JsonSerializer.Serialize(cachedFeed, jsonOptions), ct);
+                            if (message.ActionType == ActionTypeEnum.Create && cached.All(f => f.Post_id != message.Post_id.Value))
+                            {
+                                Console.WriteLine($"Добавление поста {message.Post_id}");
+                                cached.Add(post);
+                                if (cached.Count > 1000)
+                                {
+                                    var oldestPost = cached.MinBy(f => f.Creation_datetime)!;
+                                    cached.Remove(oldestPost);
+                                }
+                                return cached;
+                            }
+
+                            if (message.ActionType == ActionTypeEnum.Update)
+                            {
+                                var idx = cached.FindIndex(f => f.Post_id == message.Post_id.Value);
+                                if (idx >= 0)
+                                {
+                                    Console.WriteLine($"Обновление поста {message.Post_id}");
+                                    cached[idx] = post;
+                                    return cached;
+                                }
+                            }
+
+                            return null;
+                        }, ct);
                     }
                     consumer.StoreOffset(consumerResult);
 
@@ -129,6 +134,34 @@ namespace UserService.CacheUpdateService
         {
             var feedFromDb = await postRepository.GetFeedAsync(user_id, 0, 1000);
             await cache.SetStringAsync(key, JsonSerializer.Serialize(feedFromDb, jsonOptions), ct);
+        }
+
+        private async Task ModifyCacheAsync(string key, Func<List<Post>, CancellationToken, Task<List<Post>?>> modify, CancellationToken ct)
+        {
+            var lockKey = $"lock:{key}";
+            await using var handle = await distributedLock.AcquireAsync(lockKey, TimeSpan.FromSeconds(10));
+            if (handle is null)
+            {
+                Console.WriteLine($"Failed to acquire lock for {key}, skipping");
+                return;
+            }
+
+            var cachedFeedJson = await cache.GetStringAsync(key, ct);
+            List<Post> cachedFeed;
+            if (cachedFeedJson is null)
+            {
+                Console.WriteLine($"Cache miss for {key}, reloading from DB");
+                var userId = Guid.Parse(key.AsSpan(5));
+                cachedFeed = await postRepository.GetFeedAsync(userId, 0, 1000);
+            }
+            else
+            {
+                cachedFeed = JsonSerializer.Deserialize<List<Post>>(cachedFeedJson, jsonOptions)!;
+            }
+
+            var result = await modify(cachedFeed, ct);
+            if (result is not null)
+                await cache.SetStringAsync(key, JsonSerializer.Serialize(result, jsonOptions), ct);
         }
 
         private ConsumerConfig GetConsumerConfig()
