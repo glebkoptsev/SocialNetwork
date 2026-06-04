@@ -91,7 +91,11 @@ namespace UserService.Database
                             from friends f
                             inner join posts p on f.friend_id = p.user_id
                             where f.user_id = @User_id
-                            order by p.creation_datetime desc
+                            union all
+                            select p.user_id, p.post_id, p.creation_datetime, p.post
+                            from posts p
+                            where p.user_id = @User_id
+                            order by creation_datetime desc
                             limit @Limit offset @Offset";
             var parameters = new NpgsqlParameter[]
             {

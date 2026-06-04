@@ -8,12 +8,14 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace DialogService.API
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddOptions();
@@ -64,13 +66,51 @@ namespace DialogService.API
             builder.Services.AddTransient<UserServiceClient>();
             builder.Services.AddSingleton<NpgsqlService>();
             builder.Services.AddSingleton<IChatService, RedisChatService>();
+            builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
+                p.WithOrigins("http://localhost:3000")
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials()));
             var app = builder.Build();
+            app.UseCors("Frontend");
             app.UseMiddleware<RequestLoggingMiddleware>();
             app.UseSwagger();
             app.UseSwaggerUI();
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+
+            // Ensure dialog tables exist
+            var npgsql = app.Services.GetRequiredService<NpgsqlService>();
+            await npgsql.ExecuteNonQueryAsync("""
+                CREATE TABLE IF NOT EXISTS public.chats
+                (
+                    chat_id uuid NOT NULL,
+                    chat_name character varying(50) NOT NULL,
+                    creator_id uuid NOT NULL,
+                    creation_datetime timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    last_update_datetime timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT chats_pkey PRIMARY KEY (chat_id)
+                );
+                CREATE TABLE IF NOT EXISTS public.chat_users
+                (
+                    chat_id uuid NOT NULL,
+                    user_id uuid NOT NULL,
+                    creation_datetime timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT chat_users_pkey PRIMARY KEY (chat_id, user_id),
+                    CONSTRAINT chat_users_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats (chat_id)
+                );
+                CREATE TABLE IF NOT EXISTS public.messages
+                (
+                    message_id uuid NOT NULL,
+                    chat_id uuid NOT NULL,
+                    user_id uuid NOT NULL,
+                    message character varying(2000) NOT NULL,
+                    creation_datetime timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT messages_pkey PRIMARY KEY (message_id, chat_id)
+                )
+                """, []);
+
             app.Run();
         }
     }

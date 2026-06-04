@@ -12,6 +12,11 @@ namespace UserService.LiveFeedService
             var builder = WebApplication.CreateBuilder(args);
 
             builder.Services.AddSignalR();
+            builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
+                p.WithOrigins("http://localhost:3000")
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials()));
             builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
             builder.Services.AddAuthentication(o =>
             {
@@ -52,6 +57,7 @@ namespace UserService.LiveFeedService
 
 
             var app = builder.Build();
+            app.UseCors("Frontend");
             app.MapHub<FeedHub>("/post/feed/posted");
 
             app.Run();

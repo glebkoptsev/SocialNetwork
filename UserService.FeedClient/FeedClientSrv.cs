@@ -16,20 +16,33 @@ namespace UserService.FeedClient
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            while (!stoppingToken.IsCancellationRequested) 
+            while (!stoppingToken.IsCancellationRequested)
             {
-                await using var connection = new HubConnectionBuilder()
-                    .WithUrl(signalrHost, x => x.AccessTokenProvider = async ()
-                            => await userAuthService.GetTokenAsync())
-                    .WithAutomaticReconnect()
-                    .Build();
-
-                connection.On<string>("Receive", (message) =>
+                try
                 {
-                    Console.WriteLine(message);
-                });
-                await connection.StartAsync(stoppingToken);
-                await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
+                    var token = await userAuthService.GetTokenAsync();
+                    if (token is null)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                        continue;
+                    }
+
+                    await using var connection = new HubConnectionBuilder()
+                        .WithUrl(signalrHost, x => x.AccessTokenProvider = () => Task.FromResult<string?>(token))
+                        .WithAutomaticReconnect()
+                        .Build();
+
+                    connection.On<string>("Receive", (message) =>
+                    {
+                        Console.WriteLine(message);
+                    });
+                    await connection.StartAsync(stoppingToken);
+                    await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
+                }
+                catch
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                }
             }
         }
     }

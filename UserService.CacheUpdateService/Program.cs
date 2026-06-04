@@ -44,6 +44,19 @@ namespace UserService.CacheUpdateService
                 });
 
             var host = builder.Build();
+
+            // Ensure feed_outbox table exists
+            var npgsql = host.Services.GetRequiredService<INpgsqlService>();
+            await npgsql.ExecuteNonQueryAsync("""
+                CREATE TABLE IF NOT EXISTS public.feed_outbox (
+                    id BIGSERIAL PRIMARY KEY,
+                    kafka_key TEXT NOT NULL,
+                    kafka_value TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    processed_at TIMESTAMPTZ
+                )
+                """, []);
+
             await host.RunAsync();
         }
     }

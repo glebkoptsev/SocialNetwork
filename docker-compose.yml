@@ -1,148 +1,72 @@
-name: socialnetwork-env
+name: socialnetwork
 
 networks:
   main-network:
     driver: bridge
 
 services:
-  user_service_api:
-    container_name: user_service_api
-    image: gkoptsev/user_service_api:latest
-    build:
-      context: .
-      dockerfile: UserService.API/Dockerfile
-    ports:
-      - "5000:8080"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-    networks:
-      - main-network
-    depends_on:
-      - user_service_postgres
-      - redis
-      - kafka
-    restart: always
-
-  user_service_postgres:
-    container_name: user_service_postgres
-    image: postgres:latest
-    command: -c 'max_connections=1000'
+  # ── Databases ──────────────────────────────────────────────
+  postgres:
+    container_name: sn_postgres
+    image: postgres:16
+    command: -c max_connections=500
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P}
       POSTGRES_DB: userdb
     ports:
       - "5432:5432"
-    networks: 
-      - main-network
     volumes:
-      - ./volumes/pgmaster:/var/lib/postgresql/data
-    restart: always
-    
-  user_service_postgres_slave_first:
-    container_name: user_service_postgres_slave_first
-    image: postgres:latest
-    command: -c 'max_connections=1000'
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P}
-      POSTGRES_DB: userdb
-    ports:
-      - "5431:5432"
-    networks: 
-      - main-network
-    volumes:
-      - ./volumes/pgslave:/var/lib/postgresql/data
-    restart: always 
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      main-network:
+        aliases:
+          - user_service_postgres
+          - user_service_postgres_slave_first
+          - user_service_postgres_slave_second
+    restart: unless-stopped
 
-  user_service_postgres_slave_second:
-    container_name: user_service_postgres_slave_second
-    image: postgres:latest
-    command: -c 'max_connections=1000'
+  dialog_postgres:
+    container_name: sn_dialog_postgres
+    image: postgres:16
+    command: -c max_connections=200
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P}
-      POSTGRES_DB: userdb
+      POSTGRES_DB: dialogdb
     ports:
-      - "5430:5432"
-    networks: 
-      - main-network
+      - "5433:5432"
     volumes:
-      - ./volumes/pgslave_sec:/var/lib/postgresql/data
-    restart: always      
+      - pgdialog:/var/lib/postgresql/data
+    networks: [main-network]
+    restart: unless-stopped
 
   redis:
-    image: redis:7.4.0
-    container_name: user_service_redis
+    container_name: sn_redis
+    image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
-      - ./volumes/redisdata:/data
-    networks:
-      - main-network
-    restart: always
-    
-  user_service_cache_warmup:
-    container_name: user_service_cache_warmup
-    image: gkoptsev/user_service_cache_warmup:latest
-    build:
-      context: .
-      dockerfile: UserService.CacheWarmup/Dockerfile
-    networks:
-      - main-network
-    depends_on:
-      - user_service_postgres
-      - user_service_postgres_slave_second
-      - user_service_postgres_slave_first
-      - redis
+      - redisdata:/data
+    networks: [main-network]
+    restart: unless-stopped
 
-  user_service_feed_client:
-    container_name: user_service_feed_client
-    image: gkoptsev/user_service_feed_client:latest
-    build:
-      context: .
-      dockerfile: UserService.FeedClient/Dockerfile
-    networks:
-      - main-network
-    depends_on:
-      - live_feed_service
-      - user_service_api
-    
-  user_service_cache_update_service:
-    container_name: user_service_cache_update_service
-    image: gkoptsev/user_service_cache_update_service:latest
-    build:
-      context: .
-      dockerfile: UserService.CacheUpdateService/Dockerfile
-    networks:
-      - main-network
-    depends_on:
-      - user_service_postgres
-      - redis
-      - kafka
-      - live_feed_service
-      - user_service_api
-    restart: always
-
+  # ── Kafka ──────────────────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
-    container_name: user_service_zk
+    container_name: sn_zk
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - main-network
-    restart: always
-   
+    networks: [main-network]
+    restart: unless-stopped
+
   kafka:
-    image: confluentinc/cp-kafka:latest
-    container_name: user_service_kafka
-    depends_on:
-      - zookeeper
-    networks:
-      - main-network
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: sn_kafka
+    depends_on: [zookeeper]
     ports:
-      - 9092:9092
+      - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -150,50 +74,134 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INSIDE
       KAFKA_CREATE_TOPICS: feed-posts:1:1
-    restart: always
+    networks: [main-network]
+    restart: unless-stopped
 
-  dialog_service_api:
-    container_name: dialog_service_api
-    image: gkoptsev/dialog_service_api:latest
+  # ── .NET Services ──────────────────────────────────────────
+  user_api:
+    container_name: sn_user_api
+    build:
+      context: .
+      dockerfile: UserService.API/Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__postgres=Host=user_service_postgres:5432,user_service_postgres_slave_first:5432,user_service_postgres_slave_second:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+      - JwtSettings__Secret=${JWT_SECRET:-c8ea2ac5-0ca5-436b-af45-2033c4985a8a}
+    depends_on: [postgres, redis, kafka]
+    networks: [main-network]
+    restart: unless-stopped
+
+  dialog_api:
+    container_name: sn_dialog_api
     build:
       context: .
       dockerfile: DialogService.API/Dockerfile
     ports:
-      - "5001:8080"
+      - "5002:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-    networks:
-      - main-network
-    depends_on:
-      - redis
-    restart: always  
+      - ConnectionStrings__postgres=Host=dialog_postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=dialogdb
+      - JwtSettings__Secret=${JWT_SECRET:-c8ea2ac5-0ca5-436b-af45-2033c4985a8a}
+    depends_on: [dialog_postgres, redis, user_api]
+    networks: [main-network]
+    restart: unless-stopped
 
-  live_feed_service:
-    container_name: live_feed_service
-    image: gkoptsev/live_feed_service:latest
+  livefeed:
+    container_name: sn_livefeed
     build:
       context: .
       dockerfile: UserService.LiveFeedService/Dockerfile
     ports:
-      - "5002:8080"
+      - "5003:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-    networks:
-      - main-network
-    restart: always     
-   
-  dialog_service_postgres:
-    container_name: dialog_service_postgres
-    image: postgres:16.4
-    command: -c 'max_connections=1000'
+      - JwtSettings__Secret=${JWT_SECRET:-c8ea2ac5-0ca5-436b-af45-2033c4985a8a}
+    depends_on: [user_api]
+    networks: [main-network]
+    restart: unless-stopped
+
+  cache_update:
+    container_name: sn_cache_update
+    build:
+      context: .
+      dockerfile: UserService.CacheUpdateService/Dockerfile
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DIALOG_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P}}
-      POSTGRES_DB: dialogdb
+      - DOTNET_ENVIRONMENT=Production
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+      - AuthService__URL=http://user_api:8080/api/security/login
+      - AuthService__User_id=00000000-0000-0000-0000-000000000000
+      - AuthService__Password=placeholder
+    depends_on: [postgres, redis, kafka, livefeed, user_api]
+    networks: [main-network]
+    restart: unless-stopped
+
+  feed_client:
+    container_name: sn_feed_client
+    build:
+      context: .
+      dockerfile: UserService.FeedClient/Dockerfile
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - AuthService__URL=http://user_api:8080/api/security/login
+      - AuthService__User_id=00000000-0000-0000-0000-000000000000
+      - AuthService__Password=placeholder
+    depends_on: [livefeed, user_api]
+    networks: [main-network]
+    restart: unless-stopped
+
+  # ── Seeders (run-once) ─────────────────────────────────────
+  users_generator:
+    container_name: sn_users_generator
+    build:
+      context: .
+      dockerfile: UserService.UsersGenerator/Dockerfile
+    environment:
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+    depends_on: [postgres]
+    networks: [main-network]
+    profiles: [seed]
+
+  posts_generator:
+    container_name: sn_posts_generator
+    build:
+      context: .
+      dockerfile: UserService.PostsGenerator/Dockerfile
+    environment:
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+    depends_on: [postgres]
+    networks: [main-network]
+    profiles: [seed]
+
+  cache_warmup:
+    container_name: sn_cache_warmup
+    build:
+      context: .
+      dockerfile: UserService.CacheWarmup/Dockerfile
+    environment:
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+    depends_on: [postgres, redis]
+    networks: [main-network]
+    profiles: [seed]
+
+  # ── Frontend ───────────────────────────────────────────────
+  frontend:
+    container_name: sn_frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
-      - "5433:5432"
-    networks: 
-      - main-network
-    volumes:
-      - ./volumes/pgdialogs:/var/lib/postgresql/data
-    restart: always
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXT_PUBLIC_DIALOG_API_URL=http://localhost:5002
+      - NEXT_PUBLIC_SIGNALR_URL=http://localhost:5003
+    depends_on: [user_api, dialog_api, livefeed]
+    networks: [main-network]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  pgdialog:
+  redisdata:

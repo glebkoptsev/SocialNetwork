@@ -1,8 +1,9 @@
-FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+RUN apt-get update && apt-get install -y libkrb5-3 && rm -rf /var/lib/apt/lists/*
 USER app
 WORKDIR /app
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["UserService.CacheUpdateService/UserService.CacheUpdateService.csproj", "UserService.CacheUpdateService/"]
@@ -10,6 +11,7 @@ COPY ["UserService.Database/UserService.Database.csproj", "UserService.Database/
 COPY ["Libraries.Kafka/Libraries.Kafka.csproj", "Libraries.Kafka/"]
 COPY ["Libraries.NpgsqlService/Libraries.NpgsqlService.csproj", "Libraries.NpgsqlService/"]
 COPY ["Libraries.Clients.Common/Libraries.Clients.Common.csproj", "Libraries.Clients.Common/"]
+COPY ["Libraries.Web.Common/Libraries.Web.Common.csproj", "Libraries.Web.Common/"]
 RUN dotnet restore "./UserService.CacheUpdateService/UserService.CacheUpdateService.csproj"
 COPY . .
 WORKDIR "/src/UserService.CacheUpdateService"

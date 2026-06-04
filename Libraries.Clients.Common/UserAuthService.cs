@@ -27,6 +27,8 @@ namespace Libraries.Clients.Common
                     password = options.Value.Password 
                 });
 
+                if (!response.IsSuccessStatusCode)
+                    return null;
                 Token = await response.Content.ReadFromJsonAsync<UserAuthServiceToken>();
                 return Token?.Access_token;
             }
