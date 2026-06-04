@@ -24,7 +24,8 @@ public class EntitiesTests
             ["biography"] = "Bio",
             ["city"] = "NYC",
             ["password"] = "hash123",
-            ["can_publish_messages"] = true
+            ["can_publish_messages"] = true,
+            ["login"] = "john_doe"
         };
         var user = new User(id, data);
         Assert.Equal(id, user.User_id);
@@ -35,6 +36,7 @@ public class EntitiesTests
         Assert.Equal("NYC", user.City);
         Assert.Equal("hash123", user.Password);
         Assert.True(user.CanPublishMessages);
+        Assert.Equal("john_doe", user.Login);
     }
 
     [Fact]
@@ -78,12 +80,16 @@ public class EntitiesTests
         {
             ["user_id"] = Guid.NewGuid().ToString(),
             ["post"] = "Hello world",
-            ["creation_datetime"] = "2024-01-15T10:30:00"
+            ["creation_datetime"] = "2024-01-15T10:30:00",
+            ["first_name"] = "John",
+            ["second_name"] = "Doe"
         };
         var post = new Post(id, data);
         Assert.Equal(id, post.Post_id);
         Assert.Equal("Hello world", post.Text);
         Assert.Equal(DateTime.Parse("2024-01-15T10:30:00"), post.Creation_datetime);
+        Assert.Equal("John", post.AuthorFirstName);
+        Assert.Equal("Doe", post.AuthorSecondName);
     }
 
     [Fact]
@@ -94,11 +100,15 @@ public class EntitiesTests
             ["post_id"] = Guid.NewGuid().ToString(),
             ["user_id"] = Guid.NewGuid().ToString(),
             ["post"] = "Test post",
-            ["creation_datetime"] = "2024-06-01T12:00:00"
+            ["creation_datetime"] = "2024-06-01T12:00:00",
+            ["first_name"] = "Jane",
+            ["second_name"] = "Smith"
         };
         var post = new Post(data);
         Assert.Equal(Guid.Parse(data["post_id"].ToString()!), post.Post_id);
         Assert.Equal("Test post", post.Text);
         Assert.Equal(Convert.ToDateTime("2024-06-01T12:00:00"), post.Creation_datetime);
+        Assert.Equal("Jane", post.AuthorFirstName);
+        Assert.Equal("Smith", post.AuthorSecondName);
     }
 }

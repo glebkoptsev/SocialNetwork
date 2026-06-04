@@ -23,7 +23,7 @@ namespace Libraries.Clients.Common
 #endif
                 var response = await client.PostAsJsonAsync(url, new 
                 { 
-                    id = options.Value.User_id, 
+                    login = options.Value.Login, 
                     password = options.Value.Password 
                 });
 

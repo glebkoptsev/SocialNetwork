@@ -7,6 +7,7 @@ import Link from 'next/link'
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
+    login: '',
     first_name: '',
     second_name: '',
     birthdate: '',
@@ -24,7 +25,7 @@ export default function RegisterPage() {
     setError('')
     try {
       const userId = await register(form)
-      await login(userId, form.password)
+      await login(form.login, form.password)
       router.push('/feed')
     } catch {
       setError('Ошибка регистрации')
@@ -41,6 +42,7 @@ export default function RegisterPage() {
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
         <input className="w-full border rounded px-3 py-2" placeholder="Имя" value={form.first_name} onChange={set('first_name')} required />
         <input className="w-full border rounded px-3 py-2" placeholder="Фамилия" value={form.second_name} onChange={set('second_name')} required />
+        <input className="w-full border rounded px-3 py-2" placeholder="Логин" value={form.login} onChange={set('login')} required />
         <input className="w-full border rounded px-3 py-2" type="date" value={form.birthdate} onChange={set('birthdate')} required />
         <textarea className="w-full border rounded px-3 py-2" placeholder="О себе" value={form.biography} onChange={set('biography')} />
         <input className="w-full border rounded px-3 py-2" placeholder="Город" value={form.city} onChange={set('city')} />

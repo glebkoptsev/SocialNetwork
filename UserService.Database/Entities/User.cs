@@ -10,7 +10,8 @@ namespace UserService.Database.Entities
         public string Birthdate { get; set; } = null!;
         public string Biography { get; set; } = null!;
         public string City { get; set; } = null!;
-        public bool? CanPublishMessages { get; set; } 
+        public bool? CanPublishMessages { get; set; }
+        public string Login { get; set; } = null!;
 
         [JsonIgnore]
         public string Password { get; set; } = null!;
@@ -23,6 +24,7 @@ namespace UserService.Database.Entities
             Birthdate = data["birthdate"].ToString()!;
             Biography = data["biography"].ToString()!;
             City = data["city"].ToString()!;
+            Login = data.TryGetValue("login", out var login) ? login.ToString()! : string.Empty;
             Password = data.TryGetValue("password", out var pwd) ? pwd.ToString()! : string.Empty;
             CanPublishMessages = data.TryGetValue("can_publish_messages", out object? value) 
                 ? Convert.ToBoolean(value)

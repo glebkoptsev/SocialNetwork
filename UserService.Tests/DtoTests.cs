@@ -11,6 +11,7 @@ public class DtoTests
     {
         var request = new UserRegisterRequest
         {
+            Login = "john_doe",
             First_name = "John",
             Second_name = "Doe",
             Birthdate = "1990-01-01",
@@ -21,7 +22,8 @@ public class DtoTests
         var json = JsonSerializer.Serialize(request, Consts.JsonSerializerOptions);
         var deserialized = JsonSerializer.Deserialize<UserRegisterRequest>(json, Consts.JsonSerializerOptions);
         Assert.NotNull(deserialized);
-        Assert.Equal("John", deserialized!.First_name);
+        Assert.Equal("john_doe", deserialized!.Login);
+        Assert.Equal("John", deserialized.First_name);
         Assert.Equal("Doe", deserialized.Second_name);
         Assert.Equal("secret", deserialized.Password);
     }
@@ -39,11 +41,11 @@ public class DtoTests
     [Fact]
     public void LoginRequest_Roundtrip()
     {
-        var request = new LoginRequest { Id = Guid.NewGuid(), Password = "mypass" };
+        var request = new LoginRequest { Login = "john_doe", Password = "mypass" };
         var json = JsonSerializer.Serialize(request, Consts.JsonSerializerOptions);
         var deserialized = JsonSerializer.Deserialize<LoginRequest>(json, Consts.JsonSerializerOptions);
         Assert.NotNull(deserialized);
-        Assert.Equal(request.Id, deserialized!.Id);
+        Assert.Equal("john_doe", deserialized!.Login);
         Assert.Equal("mypass", deserialized.Password);
     }
 

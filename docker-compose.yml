@@ -131,7 +131,7 @@ services:
       - DOTNET_ENVIRONMENT=Production
       - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
       - AuthService__URL=http://user_api:8080/api/security/login
-      - AuthService__User_id=00000000-0000-0000-0000-000000000000
+      - AuthService__Login=system
       - AuthService__Password=placeholder
     depends_on: [postgres, redis, kafka, livefeed, user_api]
     networks: [main-network]
@@ -145,7 +145,7 @@ services:
     environment:
       - DOTNET_ENVIRONMENT=Production
       - AuthService__URL=http://user_api:8080/api/security/login
-      - AuthService__User_id=00000000-0000-0000-0000-000000000000
+      - AuthService__Login=system
       - AuthService__Password=placeholder
     depends_on: [livefeed, user_api]
     networks: [main-network]

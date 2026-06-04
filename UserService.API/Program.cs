@@ -126,6 +126,7 @@ namespace UserService.API
                     city character varying(255) NOT NULL,
                     password character varying(255) NOT NULL,
                     can_publish_messages bool not null default false,
+                    login character varying(50) NOT NULL,
                     CONSTRAINT pk_users PRIMARY KEY (user_id)
                 );
                 CREATE INDEX IF NOT EXISTS users_fname_sname_idx ON public.users(first_name varchar_pattern_ops, second_name varchar_pattern_ops);
@@ -157,15 +158,27 @@ namespace UserService.API
                 )
                 """, []);
 
+            // Add login column if upgrading from old schema
+            await npgsql.ExecuteNonQueryAsync("""
+                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS login VARCHAR(50) NOT NULL DEFAULT '';
+                CREATE UNIQUE INDEX IF NOT EXISTS users_login_idx ON public.users(login);
+                """, []);
+
             // Create system user for internal services
             var systemUserId = new Guid("00000000-0000-0000-0000-000000000000");
             await npgsql.ExecuteNonQueryAsync("""
-                INSERT INTO public.users (user_id, first_name, second_name, birthdate, biography, city, password)
-                VALUES (@Id, 'System', 'User', '', '', '', @Password)
+                INSERT INTO public.users (user_id, first_name, second_name, birthdate, biography, city, password, login)
+                VALUES (@Id, 'System', 'User', '', '', '', @Password, 'system')
                 ON CONFLICT (user_id) DO NOTHING
                 """, [
                 new NpgsqlParameter("Id", NpgsqlDbType.Uuid) { Value = systemUserId },
                 new NpgsqlParameter("Password", NpgsqlDbType.Varchar) { Value = PasswordHasher.Hash("placeholder") }
+            ]);
+            // Update login for system user if row already existed before login column was added
+            await npgsql.ExecuteNonQueryAsync("""
+                UPDATE public.users SET login = 'system' WHERE user_id = @Id AND login = ''
+                """, [
+                new NpgsqlParameter("Id", NpgsqlDbType.Uuid) { Value = systemUserId }
             ]);
 
             app.Run();

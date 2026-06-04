@@ -27,7 +27,7 @@ namespace UserService.API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var user = await userService.GetUserAsync(request.Id);
+            var user = await userService.GetUserByLoginAsync(request.Login);
 
             if (user is null)
                 return BadRequest("Bad credentials");

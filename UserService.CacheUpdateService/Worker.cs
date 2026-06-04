@@ -1,4 +1,5 @@
 using Confluent.Kafka;
+using Confluent.Kafka.Admin;
 using Libraries.Kafka.DTOs;
 using Libraries.Kafka;
 using Libraries.Web.Common.Caching;
@@ -58,6 +59,8 @@ namespace UserService.CacheUpdateService
 
             await using (connection!)
             {
+                await EnsureTopicExistsAsync(ct);
+
                 using var consumer = new ConsumerBuilder<string, string>(GetConsumerConfig()).Build();
                 consumer.Subscribe("feed-posts");
                 while (!ct.IsCancellationRequested)
@@ -183,6 +186,39 @@ namespace UserService.CacheUpdateService
             var result = await modify(cachedFeed, ct);
             if (result is not null)
                 await cache.SetStringAsync(key, JsonSerializer.Serialize(result, jsonOptions), ct);
+        }
+
+        private async Task EnsureTopicExistsAsync(CancellationToken ct)
+        {
+            var topic = "feed-posts";
+            for (int attempt = 1; attempt <= 10; attempt++)
+            {
+                try
+                {
+                    using var admin = new AdminClientBuilder(new AdminClientConfig
+                    {
+#if DEBUG
+                        BootstrapServers = options.Value.Host_debug,
+#else
+                        BootstrapServers = options.Value.Host,
+#endif
+                    }).Build();
+                    await admin.CreateTopicsAsync([new TopicSpecification { Name = topic, NumPartitions = 1, ReplicationFactor = (short)1 }], new CreateTopicsOptions { RequestTimeout = TimeSpan.FromSeconds(10) });
+                    Console.WriteLine($"Топик {topic} создан");
+                    return;
+                }
+                catch (CreateTopicsException e) when (e.Error.Code == ErrorCode.TopicAlreadyExists)
+                {
+                    Console.WriteLine($"Топик {topic} уже существует");
+                    return;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Попытка {attempt}/10 создать топик {topic}: {e.Message}");
+                    await Task.Delay(TimeSpan.FromSeconds(3), ct);
+                }
+            }
+            Console.WriteLine($"Не удалось создать топик {topic} после 10 попыток");
         }
 
         private ConsumerConfig GetConsumerConfig()

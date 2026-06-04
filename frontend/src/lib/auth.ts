@@ -7,8 +7,9 @@ interface AuthState {
   token: string | null
   userId: string | null
   loading: boolean
-  login: (id: string, password: string) => Promise<void>
+  login: (login: string, password: string) => Promise<void>
   register: (data: {
+    login: string
     first_name: string
     second_name: string
     birthdate: string
@@ -38,7 +39,7 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   login: async (id, password) => {
-    const { data } = await api.post('/api/security/login', { id, password })
+    const { data } = await api.post('/api/security/login', { login, password })
     document.cookie = `token=${data.access_token}; path=/; max-age=${data.expiresIn}`
     document.cookie = `userId=${id}; path=/; max-age=${data.expiresIn}`
     set({ token: data.access_token, userId: id })

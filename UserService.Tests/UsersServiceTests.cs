@@ -32,7 +32,8 @@ public class UsersServiceTests
                 ["biography"] = "Bio",
                 ["city"] = "NYC",
                 ["password"] = PasswordHasher.Hash("pass"),
-                ["can_publish_messages"] = true
+                ["can_publish_messages"] = true,
+                ["login"] = "john_doe"
             }
         };
 
@@ -49,6 +50,7 @@ public class UsersServiceTests
         Assert.NotNull(user);
         Assert.Equal("John", user!.First_name);
         Assert.Equal("Doe", user.Second_name);
+        Assert.Equal("john_doe", user.Login);
     }
 
     [Fact]
@@ -71,6 +73,7 @@ public class UsersServiceTests
     {
         var request = new UserRegisterRequest
         {
+            Login = "jane_smith",
             First_name = "Jane",
             Second_name = "Smith",
             Birthdate = "1995-05-15",
@@ -90,7 +93,7 @@ public class UsersServiceTests
         Assert.NotEqual(Guid.Empty, response.User_id);
         _npgsqlMock.Verify(x => x.ExecuteNonQueryAsync(
             It.Is<string>(s => s.Contains("INSERT")),
-            It.Is<NpgsqlParameter[]>(p => p.Length == 7)),
+            It.Is<NpgsqlParameter[]>(p => p.Length == 8)),
             Times.Once);
     }
 

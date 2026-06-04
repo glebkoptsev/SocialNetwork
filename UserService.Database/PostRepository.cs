@@ -74,26 +74,30 @@ namespace UserService.Database
 
         public async Task<Post?> GetPostAsync(Guid post_id)
         {
-            string query = @"SELECT user_id, post, creation_datetime FROM public.posts
-                            WHERE post_id = @Post_id";
+            string query = @"SELECT p.user_id, p.post, p.creation_datetime, u.first_name, u.second_name
+                             FROM public.posts p
+                             JOIN public.users u ON p.user_id = u.user_id
+                             WHERE p.post_id = @Post_id";
             var parameters = new NpgsqlParameter[]
             {
                new("Post_id", NpgsqlDbType.Uuid) { Value = post_id }
             };
-            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["user_id", "post", "creation_datetime"], TargetSessionAttributes.PreferStandby);
+            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["user_id", "post", "creation_datetime", "first_name", "second_name"], TargetSessionAttributes.PreferStandby);
             if (data.Count == 0) return null;
             return new Post(post_id, data[0]);
         }
 
         public async Task<List<Post>> GetFeedAsync(Guid user_id, int offset, int limit)
         {
-            string query = @"select p.user_id, p.post_id, p.creation_datetime, p.post 
+            string query = @"select p.user_id, p.post_id, p.creation_datetime, p.post, u.first_name, u.second_name
                             from friends f
                             inner join posts p on f.friend_id = p.user_id
+                            join public.users u on p.user_id = u.user_id
                             where f.user_id = @User_id
                             union all
-                            select p.user_id, p.post_id, p.creation_datetime, p.post
+                            select p.user_id, p.post_id, p.creation_datetime, p.post, u.first_name, u.second_name
                             from posts p
+                            join public.users u on p.user_id = u.user_id
                             where p.user_id = @User_id
                             order by creation_datetime desc
                             limit @Limit offset @Offset";
@@ -103,7 +107,7 @@ namespace UserService.Database
                new("Limit", NpgsqlDbType.Integer) { Value = limit },
                new("Offset", NpgsqlDbType.Integer) { Value = offset }
             };
-            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["user_id", "post", "creation_datetime", "post_id"], TargetSessionAttributes.PreferStandby);
+            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["user_id", "post", "creation_datetime", "post_id", "first_name", "second_name"], TargetSessionAttributes.PreferStandby);
             if (data.Count == 0) return [];
             var posts = new List<Post>();
             foreach (var post in data)

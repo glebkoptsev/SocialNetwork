@@ -12,22 +12,36 @@ namespace UserService.API.Services
 
         public async Task<User?> GetUserAsync(Guid id)
         {
-            string query = @"SELECT first_name, second_name, birthdate, biography, city, password, can_publish_messages
+            string query = @"SELECT first_name, second_name, birthdate, biography, city, password, can_publish_messages, login
                              FROM public.users
                              WHERE user_id = @User_id";
             var parameters = new NpgsqlParameter[]
             {
                 new("User_id", NpgsqlDbType.Uuid) { Value = id }
             };
-            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["first_name", "second_name", "birthdate", "biography", "city", "password", "can_publish_messages"], TargetSessionAttributes.PreferStandby);
+            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["first_name", "second_name", "birthdate", "biography", "city", "password", "can_publish_messages", "login"], TargetSessionAttributes.PreferStandby);
             if (data.Count == 0) return null;
             return new User(id, data[0]);
         }
 
+        public async Task<User?> GetUserByLoginAsync(string login)
+        {
+            string query = @"SELECT first_name, second_name, birthdate, biography, city, password, can_publish_messages, user_id, login
+                             FROM public.users
+                             WHERE login = @Login";
+            var parameters = new NpgsqlParameter[]
+            {
+                new("Login", NpgsqlDbType.Varchar) { Value = login }
+            };
+            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["first_name", "second_name", "birthdate", "biography", "city", "password", "can_publish_messages", "user_id", "login"], TargetSessionAttributes.PreferStandby);
+            if (data.Count == 0) return null;
+            return new User(Guid.Parse(data[0]["user_id"].ToString()!), data[0]);
+        }
+
         public async Task<UserRegisterResponse> RegisterUserAsync(UserRegisterRequest request)
         {
-            string query = @"INSERT INTO public.users (user_id, first_name, second_name, birthdate, biography, city, password)
-                                VALUES (@User_id, @First_name, @Second_name, @Birthdate, @Biography, @City, @Password)";
+            string query = @"INSERT INTO public.users (user_id, first_name, second_name, birthdate, biography, city, password, login)
+                                VALUES (@User_id, @First_name, @Second_name, @Birthdate, @Biography, @City, @Password, @Login)";
             var userId = Guid.NewGuid();
             var parameters = new NpgsqlParameter[]
             {
@@ -37,7 +51,8 @@ namespace UserService.API.Services
                 new(nameof(request.Birthdate), NpgsqlDbType.Varchar) { Value = request.Birthdate },
                 new(nameof(request.Biography), NpgsqlDbType.Varchar) { Value = request.Biography },
                 new(nameof(request.City), NpgsqlDbType.Varchar) { Value = request.City },
-                new(nameof(request.Password), NpgsqlDbType.Varchar) { Value = PasswordHasher.Hash(request.Password) }
+                new(nameof(request.Password), NpgsqlDbType.Varchar) { Value = PasswordHasher.Hash(request.Password) },
+                new(nameof(request.Login), NpgsqlDbType.Varchar) { Value = request.Login }
             };
             await npgsqlService.ExecuteNonQueryAsync(query, parameters);
             return new UserRegisterResponse { User_id = userId };
@@ -45,7 +60,7 @@ namespace UserService.API.Services
 
         public async Task<List<User>?> SearchUserAsync(string first_name, string second_name)
         {
-            string query = @"SELECT first_name, second_name, birthdate, biography, city, user_id
+            string query = @"SELECT first_name, second_name, birthdate, biography, city, user_id, login
                              FROM public.users
                              WHERE first_name like @First_name and second_name like @Second_name
                              ORDER BY user_id";
@@ -55,7 +70,7 @@ namespace UserService.API.Services
                 new("First_name", NpgsqlDbType.Varchar) { Value = first_name + '%' },
                 new("Second_name", NpgsqlDbType.Varchar) { Value = second_name + '%'}
             };
-            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["first_name", "second_name", "birthdate", "biography", "city", "user_id"], TargetSessionAttributes.PreferStandby);
+            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["first_name", "second_name", "birthdate", "biography", "city", "user_id", "login"], TargetSessionAttributes.PreferStandby);
             if (data.Count == 0) return null;
             var users = new List<User>();
             foreach (var user in data) 

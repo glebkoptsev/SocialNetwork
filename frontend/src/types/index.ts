@@ -5,6 +5,7 @@ export interface User {
   birthdate: string
   biography: string
   city: string
+  login: string
 }
 
 export interface Post {
@@ -12,6 +13,8 @@ export interface Post {
   user_id: string
   text: string
   creation_datetime: string
+  authorFirstName?: string
+  authorSecondName?: string
 }
 
 export interface Chat {
