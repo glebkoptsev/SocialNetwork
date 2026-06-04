@@ -12,11 +12,6 @@ namespace UserService.LiveFeedService
             var builder = WebApplication.CreateBuilder(args);
 
             builder.Services.AddSignalR();
-            builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
-                p.WithOrigins("http://localhost:3000")
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
-                    .AllowCredentials()));
             builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
             builder.Services.AddAuthentication(o =>
             {
@@ -25,9 +20,7 @@ namespace UserService.LiveFeedService
             })
             .AddJwtBearer(o =>
             {
-#if DEBUG
                 o.RequireHttpsMetadata = false;
-#endif
                 o.SaveToken = true;
                 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
                 o.TokenValidationParameters = new TokenValidationParameters
@@ -45,8 +38,7 @@ namespace UserService.LiveFeedService
                     OnMessageReceived = context =>
                     {
                         var accessToken = context.Request.Query["access_token"];
-                        if (!string.IsNullOrEmpty(accessToken) 
-                            && context.HttpContext.Request.Path.StartsWithSegments("/post/feed/posted"))
+                        if (!string.IsNullOrEmpty(accessToken))
                         {
                             context.Token = accessToken;
                         }
@@ -55,9 +47,17 @@ namespace UserService.LiveFeedService
                 };
             });
 
+            builder.Services.AddAuthorization();
+            builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
+                p.WithOrigins("http://localhost:3000")
+                    .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    .WithHeaders("authorization", "content-type", "x-requested-with")
+                    .AllowCredentials()));
 
             var app = builder.Build();
             app.UseCors("Frontend");
+            app.UseAuthentication();
+            app.UseAuthorization();
             app.MapHub<FeedHub>("/post/feed/posted");
 
             app.Run();

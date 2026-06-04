@@ -68,8 +68,8 @@ namespace DialogService.API
             builder.Services.AddSingleton<IChatService, RedisChatService>();
             builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
                 p.WithOrigins("http://localhost:3000")
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
+                    .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    .WithHeaders("authorization", "content-type", "x-requested-with")
                     .AllowCredentials()));
             var app = builder.Build();
             app.UseCors("Frontend");
