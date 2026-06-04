@@ -9,14 +9,11 @@ using UserService.Database.Entities;
 namespace UserService.API.Services
 {
     public class PostService(
-        PostRepository postRepo, 
+        IPostRepository postRepo,
         IDistributedCache distributedCache,
-        KafkaProducer<string, string> kafkaProducer,
-        FriendService friendService)
+        IKafkaProducer kafkaProducer,
+        IFriendService friendService)
     {
-        private readonly PostRepository postRepo = postRepo;
-        private readonly KafkaProducer<string, string> kafkaProducer = kafkaProducer;
-
         public async Task<Guid> AddPostAsync(Guid user_id, string post)
         {
             var post_id = await postRepo.AddPostAsync(user_id, post);

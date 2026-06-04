@@ -23,7 +23,7 @@ namespace UserService.Database.Entities
             Birthdate = data["birthdate"].ToString()!;
             Biography = data["biography"].ToString()!;
             City = data["city"].ToString()!;
-            Password = data["password"].ToString()!;
+            Password = data.TryGetValue("password", out var pwd) ? pwd.ToString()! : string.Empty;
             CanPublishMessages = data.TryGetValue("can_publish_messages", out object? value) 
                 ? Convert.ToBoolean(value)
                 : null;

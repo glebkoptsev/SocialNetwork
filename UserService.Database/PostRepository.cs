@@ -5,10 +5,8 @@ using UserService.Database.Entities;
 
 namespace UserService.Database
 {
-    public class PostRepository(NpgsqlService npgsqlService)
+    public class PostRepository(INpgsqlService npgsqlService) : IPostRepository
     {
-        private readonly NpgsqlService npgsqlService = npgsqlService;
-
         public async Task<Guid> AddPostAsync(Guid user_id, string post)
         {
             string query = @"INSERT INTO public.posts (post_id, user_id, post)

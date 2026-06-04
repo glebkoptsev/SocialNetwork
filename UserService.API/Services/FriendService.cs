@@ -8,10 +8,8 @@ using System.Text.Json;
 
 namespace UserService.API.Services
 {
-    public class FriendService(NpgsqlService npgsqlService, KafkaProducer<string, string> kafkaProducer)
+    public class FriendService(INpgsqlService npgsqlService, IKafkaProducer kafkaProducer) : IFriendService
     {
-        private readonly NpgsqlService npgsqlService = npgsqlService;
-        private readonly KafkaProducer<string, string> kafkaProducer = kafkaProducer;
 
         public async Task AddFriendAsync(Guid user_id, Guid friend_id)
         {

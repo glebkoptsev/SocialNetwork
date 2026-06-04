@@ -7,9 +7,8 @@ using UserService.Database.Entities;
 
 namespace UserService.API.Services
 {
-    public class UsersService(NpgsqlService npgsqlService)
+    public class UsersService(INpgsqlService npgsqlService)
     {
-        private readonly NpgsqlService npgsqlService = npgsqlService;
 
         public async Task<User?> GetUserAsync(Guid id)
         {
@@ -46,7 +45,7 @@ namespace UserService.API.Services
 
         public async Task<List<User>?> SearchUserAsync(string first_name, string second_name)
         {
-            string query = @"SELECT first_name, second_name, birthdate, biography, city, password, user_id
+            string query = @"SELECT first_name, second_name, birthdate, biography, city, user_id
                              FROM public.users
                              WHERE first_name like @First_name and second_name like @Second_name
                              ORDER BY user_id";
@@ -56,7 +55,7 @@ namespace UserService.API.Services
                 new("First_name", NpgsqlDbType.Varchar) { Value = first_name + '%' },
                 new("Second_name", NpgsqlDbType.Varchar) { Value = second_name + '%'}
             };
-            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["first_name", "second_name", "birthdate", "biography", "city", "password", "user_id"], TargetSessionAttributes.PreferStandby);
+            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["first_name", "second_name", "birthdate", "biography", "city", "user_id"], TargetSessionAttributes.PreferStandby);
             if (data.Count == 0) return null;
             var users = new List<User>();
             foreach (var user in data) 

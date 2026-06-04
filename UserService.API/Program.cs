@@ -1,9 +1,11 @@
 using Libraries.Kafka;
 using Libraries.NpgsqlService;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
+using System.Threading.RateLimiting;
 using UserService.API.Services;
 using Libraries.Web.Common.Settings;
 using Libraries.Web.Common.Swagger;
@@ -43,6 +45,17 @@ namespace UserService.API
             });
 
             builder.Services.AddAuthorization();
+            builder.Services.AddRateLimiter(o =>
+            {
+                o.AddFixedWindowLimiter("LoginPolicy", c =>
+                {
+                    c.PermitLimit = 10;
+                    c.Window = TimeSpan.FromMinutes(1);
+                    c.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    c.QueueLimit = 0;
+                });
+                o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            });
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(o =>
@@ -67,17 +80,18 @@ namespace UserService.API
                 options.Configuration = builder.Configuration.GetConnectionString("redis");
 #endif
             });
-            builder.Services.AddSingleton<NpgsqlService>();
+            builder.Services.AddSingleton<INpgsqlService, NpgsqlService>();
             builder.Services.AddTransient<UsersService>();
-            builder.Services.AddTransient<FriendService>();
-            builder.Services.AddTransient<PostRepository>();
+            builder.Services.AddTransient<IFriendService, FriendService>();
+            builder.Services.AddTransient<IPostRepository, PostRepository>();
             builder.Services.AddTransient<PostService>();
             builder.Services.AddSingleton<KafkaClientHandle>();
-            builder.Services.AddSingleton<KafkaProducer<string, string>>();
+            builder.Services.AddSingleton<IKafkaProducer, KafkaProducer<string, string>>();
             var app = builder.Build();
             app.UseMiddleware<RequestLoggingMiddleware>();
             app.UseSwagger();
             app.UseSwaggerUI();
+            app.UseRateLimiter();
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();

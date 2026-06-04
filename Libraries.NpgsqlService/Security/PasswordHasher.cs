@@ -6,7 +6,7 @@ namespace Libraries.NpgsqlService.Security
     {
         private const int SaltSize = 16; // 128 bit
         private const int KeySize = 32; // 256 bit
-        private const int Iterations = 10;
+        private const int Iterations = 210_000;
 
         public static string Hash(string password)
         {

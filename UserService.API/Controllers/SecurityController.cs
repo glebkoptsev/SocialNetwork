@@ -1,6 +1,7 @@
 using Libraries.NpgsqlService.Security;
 using Libraries.Web.Common.Settings;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -12,6 +13,7 @@ namespace UserService.API.Controllers
 {
     [ApiController]
     [Route("api/security")]
+    [EnableRateLimiting("LoginPolicy")]
     public class SecurityController(UsersService userService, IOptions<JwtSettings> options) : ControllerBase
     {
         private readonly UsersService userService = userService;

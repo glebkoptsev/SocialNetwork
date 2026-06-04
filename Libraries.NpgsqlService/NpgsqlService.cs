@@ -4,7 +4,7 @@ using System.Data;
 
 namespace Libraries.NpgsqlService
 {
-    public class NpgsqlService : IAsyncDisposable, IDisposable
+    public class NpgsqlService : IAsyncDisposable, IDisposable, INpgsqlService
     {
         private NpgsqlMultiHostDataSource Npgsql { get; }
         public NpgsqlService(IConfiguration configuration)
