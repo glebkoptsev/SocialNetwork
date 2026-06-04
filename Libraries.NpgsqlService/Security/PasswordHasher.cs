@@ -10,11 +10,15 @@ namespace Libraries.NpgsqlService.Security
 
         public static string Hash(string password)
         {
-            using var algorithm = new Rfc2898DeriveBytes(password, SaltSize, Iterations, HashAlgorithmName.SHA512);
-            var key = Convert.ToBase64String(algorithm.GetBytes(KeySize));
-            var salt = Convert.ToBase64String(algorithm.Salt);
+            var salt = RandomNumberGenerator.GetBytes(SaltSize);
+            var key = Rfc2898DeriveBytes.Pbkdf2(
+                password,
+                salt,
+                Iterations,
+                HashAlgorithmName.SHA512,
+                KeySize);
 
-            return $"{Iterations}.{salt}.{key}";
+            return $"{Iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(key)}";
         }
 
         public static bool Check(string hash, string password)
@@ -31,11 +35,14 @@ namespace Libraries.NpgsqlService.Security
             var salt = Convert.FromBase64String(parts[1]);
             var key = Convert.FromBase64String(parts[2]);
 
-            using var algorithm = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA512);
-            var keyToCheck = algorithm.GetBytes(KeySize);
+            var keyToCheck = Rfc2898DeriveBytes.Pbkdf2(
+                password,
+                salt,
+                iterations,
+                HashAlgorithmName.SHA512,
+                KeySize);
 
             return keyToCheck.SequenceEqual(key);
-
         }
     }
 }
