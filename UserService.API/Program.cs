@@ -29,7 +29,9 @@ namespace UserService.API
             })
             .AddJwtBearer(o =>
             {
+#if DEBUG
                 o.RequireHttpsMetadata = false;
+#endif
                 o.SaveToken = true;
                 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
                 o.TokenValidationParameters = new TokenValidationParameters
@@ -85,8 +87,6 @@ namespace UserService.API
             builder.Services.AddTransient<IFriendService, FriendService>();
             builder.Services.AddTransient<IPostRepository, PostRepository>();
             builder.Services.AddTransient<PostService>();
-            builder.Services.AddSingleton<KafkaClientHandle>();
-            builder.Services.AddSingleton<IKafkaProducer, KafkaProducer<string, string>>();
             var app = builder.Build();
             app.UseMiddleware<RequestLoggingMiddleware>();
             app.UseSwagger();

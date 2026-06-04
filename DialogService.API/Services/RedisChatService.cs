@@ -102,6 +102,8 @@ namespace DialogService.API.Services
             var db = redis.GetDatabase(0);
             var chat_res = await db.ExecuteAsync("FCALL", "get_something", 1, $"chat-{chat_id}");
             var chat = JsonSerializer.Deserialize<RedisChat>(chat_res.ToString(), jsonOptions)!;
+            if (!chat.Users.Contains(creator_id))
+                throw new UnauthorizedAccessException("User is not a member of this chat");
             var msg = new RedisChatMessage
             {
                 Created_at = DateTime.Now,

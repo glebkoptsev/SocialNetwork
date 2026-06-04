@@ -1,14 +1,13 @@
-﻿using Confluent.Kafka;
-using Libraries.Kafka;
-using Libraries.Kafka.DTOs;
+﻿using Libraries.Kafka.DTOs;
 using Libraries.NpgsqlService;
 using Npgsql;
 using NpgsqlTypes;
 using System.Text.Json;
+using UserService.Database;
 
 namespace UserService.API.Services
 {
-    public class FriendService(INpgsqlService npgsqlService, IKafkaProducer kafkaProducer) : IFriendService
+    public class FriendService(INpgsqlService npgsqlService) : IFriendService
     {
 
         public async Task AddFriendAsync(Guid user_id, Guid friend_id)
@@ -20,14 +19,12 @@ namespace UserService.API.Services
                 new("User_id", NpgsqlDbType.Uuid) { Value = user_id },
                 new("Friend_id", NpgsqlDbType.Uuid) { Value = friend_id },
             };
-            await npgsqlService.ExecuteNonQueryAsync(query, parameters);
-            var message = new Message<string, string>
-            {
-                Key = user_id.ToString(),
-                Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.FullReload, null, user_id, null), Consts.JsonSerializerOptions),
-                Timestamp = Timestamp.Default
-            };
-            await kafkaProducer.ProduceAsync("feed-posts", message);
+            var outboxValue = JsonSerializer.Serialize(
+                new FeedUpdateMessage(ActionTypeEnum.FullReload, null, user_id, null),
+                Consts.JsonSerializerOptions);
+            await npgsqlService.ExecuteTransactionAsync(
+                [query, outboxInsert],
+                [parameters, outboxParams(user_id.ToString(), outboxValue)]);
         }
 
         public async Task DeleteFriendAsync(Guid user_id, Guid friend_id)
@@ -39,14 +36,12 @@ namespace UserService.API.Services
                 new("User_id", NpgsqlDbType.Uuid) { Value = user_id },
                 new("Friend_id", NpgsqlDbType.Uuid) { Value = friend_id },
             };
-            await npgsqlService.ExecuteNonQueryAsync(query, parameters);
-            var message = new Message<string, string>
-            {
-                Key = user_id.ToString(),
-                Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.FullReload, null, user_id, null), Consts.JsonSerializerOptions),
-                Timestamp = Timestamp.Default
-            };
-            await kafkaProducer.ProduceAsync("feed-posts", message);
+            var outboxValue = JsonSerializer.Serialize(
+                new FeedUpdateMessage(ActionTypeEnum.FullReload, null, user_id, null),
+                Consts.JsonSerializerOptions);
+            await npgsqlService.ExecuteTransactionAsync(
+                [query, outboxInsert],
+                [parameters, outboxParams(user_id.ToString(), outboxValue)]);
         }
 
         public async Task<List<Guid>> GetFriendsAsync(Guid user_id)
@@ -67,5 +62,14 @@ namespace UserService.API.Services
             }
             return posts;
         }
+
+        private static readonly string outboxInsert =
+            @"INSERT INTO public.feed_outbox (kafka_key, kafka_value) VALUES (@Key, @Value)";
+
+        private static NpgsqlParameter[] outboxParams(string key, string value) =>
+        [
+            new("Key", NpgsqlDbType.Varchar) { Value = key },
+            new("Value", NpgsqlDbType.Text) { Value = value }
+        ];
     }
 }

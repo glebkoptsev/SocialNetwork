@@ -30,6 +30,24 @@ namespace Libraries.NpgsqlService
             GC.SuppressFinalize(this);
         }
 
+        public async Task ExecuteTransactionAsync(string[] queries, NpgsqlParameter[][] parameters)
+        {
+            await using var connection = await Npgsql.OpenConnectionAsync(TargetSessionAttributes.Primary);
+            await using var transaction = await connection.BeginTransactionAsync();
+            await using var cmd = new NpgsqlCommand(queries[0], connection, transaction);
+
+            for (int i = 0; i < queries.Length; i++)
+            {
+                cmd.CommandText = queries[i];
+                cmd.Parameters.Clear();
+                if (parameters[i].Length > 0)
+                    cmd.Parameters.AddRange(parameters[i]);
+                await cmd.ExecuteNonQueryAsync();
+            }
+
+            await transaction.CommitAsync();
+        }
+
         public async Task<int> ExecuteNonQueryAsync(string query, NpgsqlParameter[] parameters)
         {
             await using var connection = await Npgsql.OpenConnectionAsync(TargetSessionAttributes.Primary);

@@ -20,7 +20,9 @@ namespace UserService.LiveFeedService
             })
             .AddJwtBearer(o =>
             {
+#if DEBUG
                 o.RequireHttpsMetadata = false;
+#endif
                 o.SaveToken = true;
                 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
                 o.TokenValidationParameters = new TokenValidationParameters

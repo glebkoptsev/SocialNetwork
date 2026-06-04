@@ -16,7 +16,10 @@ namespace UserService.CacheUpdateService
                     services.AddOptions();
                     services.Configure<KafkaSettings>(hostContext.Configuration.GetSection("KafkaSettings"));
                     services.Configure<UserAuthServiceOptions>(hostContext.Configuration.GetSection("AuthService"));
-                    services.AddSingleton<NpgsqlService>();
+                    services.AddSingleton<INpgsqlService, NpgsqlService>();
+                    services.AddSingleton<IFeedOutboxStore, FeedOutboxStore>();
+                    services.AddSingleton<IKafkaProducer, KafkaProducer<string, string>>();
+                    services.AddSingleton<KafkaClientHandle>();
                     services.AddHttpClient<UserAuthService>();
                     services.AddSingleton<UserAuthService>();
                     services.AddTransient<PostRepository>();
@@ -29,6 +32,7 @@ namespace UserService.CacheUpdateService
 #endif
                     });
                     services.AddHostedService<Worker>();
+                    services.AddHostedService<OutboxPublisher>();
                 });
 
             var host = builder.Build();

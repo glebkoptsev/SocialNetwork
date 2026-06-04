@@ -15,7 +15,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DialogService.Database\DialogService.Database.csproj" />
-    <ProjectReference Include="..\Libraries.NpgsqlService\Libraries.NpgsqlService.csproj" />
     <ProjectReference Include="..\Libraries.Web.Common\Libraries.Web.Common.csproj" />
   </ItemGroup>
 

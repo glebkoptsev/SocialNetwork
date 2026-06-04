@@ -109,7 +109,15 @@ namespace UserService.CacheWarmup
 	                        PRIMARY KEY(post_id),
 	                        FOREIGN KEY (user_id) REFERENCES users (user_id)
                         );
-                        CREATE INDEX IF NOT EXISTS posts_userid_idx ON public.posts(user_id);";
+                        CREATE INDEX IF NOT EXISTS posts_userid_idx ON public.posts(user_id);
+                        CREATE TABLE IF NOT EXISTS public.feed_outbox 
+                        (
+                            id BIGSERIAL PRIMARY KEY,
+                            kafka_key TEXT NOT NULL,
+                            kafka_value TEXT NOT NULL,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                            processed_at TIMESTAMPTZ
+                        );";
 
 
             await npgsql.ExecuteNonQueryAsync(query, []);

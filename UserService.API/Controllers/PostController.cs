@@ -13,7 +13,7 @@ namespace UserService.API.Controllers
     {
         private readonly PostService postService = postService;
 
-        [HttpGet, Route("get/{post_id}")]
+        [HttpGet, Route("get/{post_id}"), Authorize]
         public async Task<ActionResult<Post>> GetPost(Guid post_id)
         {
             var post = await postService.GetPostAsync(post_id);

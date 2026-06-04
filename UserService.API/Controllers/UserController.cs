@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using UserService.API.DTOs;
@@ -18,7 +19,7 @@ namespace UserService.API.Controllers
             return Ok(await userService.RegisterUserAsync(request));
         }
 
-        [HttpGet, Route("get/{id}")]
+        [HttpGet, Route("get/{id}"), Authorize]
         public async Task<ActionResult<User>> GetUser(Guid id)
         {
             var user = await userService.GetUserAsync(id);
@@ -26,7 +27,7 @@ namespace UserService.API.Controllers
             return Ok(user);
         }
 
-        [HttpGet, Route("search")]
+        [HttpGet, Route("search"), Authorize]
         public async Task<ActionResult<List<User>>> SearchUser([Required] string first_name, [Required] string second_name)
         {
             var users = await userService.SearchUserAsync(first_name, second_name);

@@ -20,9 +20,14 @@ public class PostRepositoryTests
     public async Task AddPostAsync_ReturnsNewGuid()
     {
         var userId = Guid.NewGuid();
-        var postId = await _repo.AddPostAsync(userId, "test post");
+        var expectedId = Guid.NewGuid();
+        _npgsqlMock
+            .Setup(x => x.ExecuteNonQueryAsync(It.IsAny<string>(), It.IsAny<NpgsqlParameter[]>()))
+            .ReturnsAsync(1);
 
-        Assert.NotEqual(Guid.Empty, postId);
+        var postId = await _repo.AddPostAsync(userId, "test post", expectedId);
+
+        Assert.Equal(expectedId, postId);
         _npgsqlMock.Verify(x => x.ExecuteNonQueryAsync(
             It.Is<string>(s => s.Contains("INSERT")),
             It.Is<NpgsqlParameter[]>(p => p.Length == 3)),
@@ -34,6 +39,10 @@ public class PostRepositoryTests
     {
         var postId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+
+        _npgsqlMock
+            .Setup(x => x.ExecuteNonQueryAsync(It.IsAny<string>(), It.IsAny<NpgsqlParameter[]>()))
+            .ReturnsAsync(1);
 
         await _repo.UpdatePostAsync(postId, "updated", userId);
 
@@ -49,11 +58,54 @@ public class PostRepositoryTests
         var postId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
+        _npgsqlMock
+            .Setup(x => x.ExecuteNonQueryAsync(It.IsAny<string>(), It.IsAny<NpgsqlParameter[]>()))
+            .ReturnsAsync(1);
+
         await _repo.DeletePostAsync(postId, userId);
 
         _npgsqlMock.Verify(x => x.ExecuteNonQueryAsync(
             It.Is<string>(s => s.Contains("DELETE")),
             It.Is<NpgsqlParameter[]>(p => p.Length == 2)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task AddPostAsync_WithOutboxEntries_UsesTransaction()
+    {
+        var userId = Guid.NewGuid();
+        var postId = Guid.NewGuid();
+        var entries = new[] { new OutboxEntry("key1", "val1"), new OutboxEntry("key2", "val2") };
+
+        _npgsqlMock
+            .Setup(x => x.ExecuteTransactionAsync(It.IsAny<string[]>(), It.IsAny<NpgsqlParameter[][]>()))
+            .Returns(Task.CompletedTask);
+
+        var result = await _repo.AddPostAsync(userId, "test", postId, entries);
+
+        Assert.Equal(postId, result);
+        _npgsqlMock.Verify(x => x.ExecuteTransactionAsync(
+            It.Is<string[]>(q => q.Length == 3 && q[0].Contains("INSERT")),
+            It.IsAny<NpgsqlParameter[][]>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task AddPostAsync_WithoutOutboxEntries_UsesSimpleInsert()
+    {
+        var userId = Guid.NewGuid();
+        var postId = Guid.NewGuid();
+
+        _npgsqlMock
+            .Setup(x => x.ExecuteNonQueryAsync(It.IsAny<string>(), It.IsAny<NpgsqlParameter[]>()))
+            .ReturnsAsync(1);
+
+        var result = await _repo.AddPostAsync(userId, "test", postId, null);
+
+        Assert.Equal(postId, result);
+        _npgsqlMock.Verify(x => x.ExecuteNonQueryAsync(
+            It.Is<string>(s => s.Contains("INSERT")),
+            It.Is<NpgsqlParameter[]>(p => p.Length == 3)),
             Times.Once);
     }
 

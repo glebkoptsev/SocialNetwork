@@ -1,6 +1,4 @@
-﻿using Confluent.Kafka;
-using Libraries.Kafka;
-using Libraries.Kafka.DTOs;
+﻿using Libraries.Kafka.DTOs;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using UserService.Database;
@@ -11,56 +9,43 @@ namespace UserService.API.Services
     public class PostService(
         IPostRepository postRepo,
         IDistributedCache distributedCache,
-        IKafkaProducer kafkaProducer,
         IFriendService friendService)
     {
         public async Task<Guid> AddPostAsync(Guid user_id, string post)
         {
-            var post_id = await postRepo.AddPostAsync(user_id, post);
+            var postId = Guid.NewGuid();
             var friends = await friendService.GetFriendsAsync(user_id);
-            foreach (var friend in friends) 
-            {
-                var message = new Message<string, string>
-                {
-                    Key = friend.ToString(),
-                    Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.Create, post_id, user_id, post), Consts.JsonSerializerOptions),
-                    Timestamp = Timestamp.Default
-                };
-                await kafkaProducer.ProduceAsync("feed-posts", message);
-            }
-            return post_id;
+            var outboxEntries = friends.Select(f => new OutboxEntry(
+                f.ToString(),
+                JsonSerializer.Serialize(
+                    new FeedUpdateMessage(ActionTypeEnum.Create, postId, user_id, post),
+                    Consts.JsonSerializerOptions)
+            )).ToArray();
+            return await postRepo.AddPostAsync(user_id, post, postId, outboxEntries);
         }
 
         public async Task UpdatePostAsync(Guid post_id, string post, Guid user_id)
         {
-            await postRepo.UpdatePostAsync(post_id, post, user_id);
             var friends = await friendService.GetFriendsAsync(user_id);
-            foreach (var friend in friends)
-            {
-                var message = new Message<string, string>
-                {
-                    Key = friend.ToString(),
-                    Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.Update, post_id, user_id, post), Consts.JsonSerializerOptions),
-                    Timestamp = Timestamp.Default
-                };
-                await kafkaProducer.ProduceAsync("feed-posts", message);
-            }
+            var outboxEntries = friends.Select(f => new OutboxEntry(
+                f.ToString(),
+                JsonSerializer.Serialize(
+                    new FeedUpdateMessage(ActionTypeEnum.Update, post_id, user_id, post),
+                    Consts.JsonSerializerOptions)
+            )).ToArray();
+            await postRepo.UpdatePostAsync(post_id, post, user_id, outboxEntries);
         }
 
         public async Task DeletePostAsync(Guid post_id, Guid user_id)
         {
-            await postRepo.DeletePostAsync(post_id, user_id);
             var friends = await friendService.GetFriendsAsync(user_id);
-            foreach (var friend in friends)
-            {
-                var message = new Message<string, string>
-                {
-                    Key = friend.ToString(),
-                    Value = JsonSerializer.Serialize(new FeedUpdateMessage(ActionTypeEnum.Delete, post_id, user_id, null), Consts.JsonSerializerOptions),
-                    Timestamp = Timestamp.Default
-                };
-                await kafkaProducer.ProduceAsync("feed-posts", message);
-            }
+            var outboxEntries = friends.Select(f => new OutboxEntry(
+                f.ToString(),
+                JsonSerializer.Serialize(
+                    new FeedUpdateMessage(ActionTypeEnum.Delete, post_id, user_id, null),
+                    Consts.JsonSerializerOptions)
+            )).ToArray();
+            await postRepo.DeletePostAsync(post_id, user_id, outboxEntries);
         }
 
         public async Task<Post?> GetPostAsync(Guid post_id)
@@ -77,7 +62,6 @@ namespace UserService.API.Services
             {
                 cachedFeed = JsonSerializer.Deserialize<List<Post>>(cachedFeedJson, Consts.JsonSerializerOptions);
             }
-            //если кеша нет или в нём нет нужного кол-ва данных, то берем из базы
             return cachedFeed != null && cachedFeed.Count >= offset + limit
                 ? cachedFeed.OrderByDescending(f => f.Creation_datetime).Skip(offset).Take(limit)
                 : await postRepo.GetFeedAsync(user_id, offset, limit);

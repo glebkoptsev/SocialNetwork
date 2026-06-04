@@ -1,6 +1,4 @@
 using System.Text;
-using Confluent.Kafka;
-using Libraries.Kafka;
 using Microsoft.Extensions.Caching.Distributed;
 using Moq;
 using UserService.API.Services;
@@ -13,7 +11,6 @@ public class PostServiceTests
 {
     private readonly Mock<IPostRepository> _repoMock;
     private readonly Mock<IDistributedCache> _cacheMock;
-    private readonly Mock<IKafkaProducer> _kafkaMock;
     private readonly Mock<IFriendService> _friendMock;
     private readonly PostService _service;
 
@@ -21,41 +18,43 @@ public class PostServiceTests
     {
         _repoMock = new Mock<IPostRepository>();
         _cacheMock = new Mock<IDistributedCache>();
-        _kafkaMock = new Mock<IKafkaProducer>();
         _friendMock = new Mock<IFriendService>();
-        _service = new PostService(_repoMock.Object, _cacheMock.Object, _kafkaMock.Object, _friendMock.Object);
+        _service = new PostService(_repoMock.Object, _cacheMock.Object, _friendMock.Object);
     }
 
     [Fact]
     public async Task AddPostAsync_ReturnsPostId_AndNotifiesFriends()
     {
         var userId = Guid.NewGuid();
-        var postId = Guid.NewGuid();
         var friends = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() };
 
-        _repoMock.Setup(x => x.AddPostAsync(userId, "Hello")).ReturnsAsync(postId);
+        _repoMock
+            .Setup(x => x.AddPostAsync(It.IsAny<Guid>(), "Hello", It.IsAny<Guid>(), It.IsAny<OutboxEntry[]>()))
+            .ReturnsAsync((Guid uid, string _, Guid pid, OutboxEntry[] _) => pid);
         _friendMock.Setup(x => x.GetFriendsAsync(userId)).ReturnsAsync(friends);
 
         var result = await _service.AddPostAsync(userId, "Hello");
 
-        Assert.Equal(postId, result);
-        _kafkaMock.Verify(x => x.ProduceAsync("feed-posts", It.IsAny<Message<string, string>>()), Times.Exactly(2));
-        _repoMock.Verify(x => x.AddPostAsync(userId, "Hello"), Times.Once);
+        Assert.NotEqual(Guid.Empty, result);
+        _repoMock.Verify(x => x.AddPostAsync(userId, "Hello", result,
+            It.Is<OutboxEntry[]>(o => o.Length == friends.Count)), Times.Once);
     }
 
     [Fact]
     public async Task AddPostAsync_NoFriends_DoesNotProduceMessages()
     {
         var userId = Guid.NewGuid();
-        var postId = Guid.NewGuid();
 
-        _repoMock.Setup(x => x.AddPostAsync(userId, "Alone")).ReturnsAsync(postId);
+        _repoMock
+            .Setup(x => x.AddPostAsync(It.IsAny<Guid>(), "Alone", It.IsAny<Guid>(), It.IsAny<OutboxEntry[]>()))
+            .ReturnsAsync((Guid uid, string _, Guid pid, OutboxEntry[] o) => pid);
         _friendMock.Setup(x => x.GetFriendsAsync(userId)).ReturnsAsync(new List<Guid>());
 
         var result = await _service.AddPostAsync(userId, "Alone");
 
-        Assert.Equal(postId, result);
-        _kafkaMock.Verify(x => x.ProduceAsync("feed-posts", It.IsAny<Message<string, string>>()), Times.Never);
+        Assert.NotEqual(Guid.Empty, result);
+        _repoMock.Verify(x => x.AddPostAsync(userId, "Alone", result,
+            It.Is<OutboxEntry[]>(o => o.Length == 0)), Times.Once);
     }
 
     [Fact]
@@ -69,8 +68,8 @@ public class PostServiceTests
 
         await _service.UpdatePostAsync(postId, "Updated", userId);
 
-        _repoMock.Verify(x => x.UpdatePostAsync(postId, "Updated", userId), Times.Once);
-        _kafkaMock.Verify(x => x.ProduceAsync("feed-posts", It.IsAny<Message<string, string>>()), Times.Once);
+        _repoMock.Verify(x => x.UpdatePostAsync(postId, "Updated", userId,
+            It.Is<OutboxEntry[]>(o => o.Length == 1)), Times.Once);
     }
 
     [Fact]
@@ -84,8 +83,8 @@ public class PostServiceTests
 
         await _service.DeletePostAsync(postId, userId);
 
-        _repoMock.Verify(x => x.DeletePostAsync(postId, userId), Times.Once);
-        _kafkaMock.Verify(x => x.ProduceAsync("feed-posts", It.IsAny<Message<string, string>>()), Times.Once);
+        _repoMock.Verify(x => x.DeletePostAsync(postId, userId,
+            It.Is<OutboxEntry[]>(o => o.Length == 1)), Times.Once);
     }
 
     [Fact]

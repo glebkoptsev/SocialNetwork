@@ -1,5 +1,3 @@
-using Confluent.Kafka;
-using Libraries.Kafka;
 using Libraries.NpgsqlService;
 using Moq;
 using Npgsql;
@@ -10,14 +8,12 @@ namespace UserService.Tests;
 public class FriendServiceTests
 {
     private readonly Mock<INpgsqlService> _npgsqlMock;
-    private readonly Mock<IKafkaProducer> _kafkaMock;
     private readonly FriendService _service;
 
     public FriendServiceTests()
     {
         _npgsqlMock = new Mock<INpgsqlService>();
-        _kafkaMock = new Mock<IKafkaProducer>();
-        _service = new FriendService(_npgsqlMock.Object, _kafkaMock.Object);
+        _service = new FriendService(_npgsqlMock.Object);
     }
 
     [Fact]
@@ -27,21 +23,16 @@ public class FriendServiceTests
         var friendId = Guid.NewGuid();
 
         _npgsqlMock
-            .Setup(x => x.ExecuteNonQueryAsync(
-                It.IsAny<string>(),
-                It.IsAny<NpgsqlParameter[]>()))
-            .ReturnsAsync(1);
+            .Setup(x => x.ExecuteTransactionAsync(
+                It.IsAny<string[]>(),
+                It.IsAny<NpgsqlParameter[][]>()))
+            .Returns(Task.CompletedTask);
 
         await _service.AddFriendAsync(userId, friendId);
 
-        _npgsqlMock.Verify(x => x.ExecuteNonQueryAsync(
-            It.Is<string>(s => s.Contains("INSERT")),
-            It.Is<NpgsqlParameter[]>(p => p.Length == 2)),
-            Times.Once);
-
-        _kafkaMock.Verify(x => x.ProduceAsync(
-            "feed-posts",
-            It.Is<Message<string, string>>(m => m.Key == userId.ToString())),
+        _npgsqlMock.Verify(x => x.ExecuteTransactionAsync(
+            It.Is<string[]>(q => q.Length == 2 && q[0].Contains("INSERT")),
+            It.Is<NpgsqlParameter[][]>(p => p.Length == 2)),
             Times.Once);
     }
 
@@ -52,21 +43,16 @@ public class FriendServiceTests
         var friendId = Guid.NewGuid();
 
         _npgsqlMock
-            .Setup(x => x.ExecuteNonQueryAsync(
-                It.IsAny<string>(),
-                It.IsAny<NpgsqlParameter[]>()))
-            .ReturnsAsync(1);
+            .Setup(x => x.ExecuteTransactionAsync(
+                It.IsAny<string[]>(),
+                It.IsAny<NpgsqlParameter[][]>()))
+            .Returns(Task.CompletedTask);
 
         await _service.DeleteFriendAsync(userId, friendId);
 
-        _npgsqlMock.Verify(x => x.ExecuteNonQueryAsync(
-            It.Is<string>(s => s.Contains("DELETE")),
-            It.Is<NpgsqlParameter[]>(p => p.Length == 2)),
-            Times.Once);
-
-        _kafkaMock.Verify(x => x.ProduceAsync(
-            "feed-posts",
-            It.Is<Message<string, string>>(m => m.Key == userId.ToString())),
+        _npgsqlMock.Verify(x => x.ExecuteTransactionAsync(
+            It.Is<string[]>(q => q.Length == 2 && q[0].Contains("DELETE")),
+            It.Is<NpgsqlParameter[][]>(p => p.Length == 2)),
             Times.Once);
     }
 
