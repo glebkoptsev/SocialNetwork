@@ -47,6 +47,11 @@ namespace UserService.API.Services
             await context.SaveChangesAsync();
         }
 
+        public async Task<bool> IsFriendAsync(Guid user_id, Guid friend_id)
+        {
+            return await context.Friends.AnyAsync(f => f.User_id == user_id && f.Friend_id == friend_id);
+        }
+
         public async Task<List<Guid>> GetFriendsAsync(Guid user_id)
         {
             var friendIds = await context.Friends

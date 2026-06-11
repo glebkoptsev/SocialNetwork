@@ -2,28 +2,45 @@
 
 import { useState } from 'react'
 import { api } from '@/lib/api'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 
 export default function FriendButton({ userId, friendId }: { userId: string; friendId: string }) {
   const [loading, setLoading] = useState(false)
-  const queryClient = useQueryClient()
+
+  const { data: isFriend, refetch } = useQuery({
+    queryKey: ['friend-status', friendId],
+    queryFn: () => api.get<boolean>(`/api/friend/status/${friendId}`).then((r) => r.data),
+    enabled: userId !== friendId,
+  })
 
   if (userId === friendId) return null
 
-  const handleAdd = async () => {
+  const handleToggle = async () => {
     setLoading(true)
-    await api.put(`/api/friend/set/${friendId}`)
-    queryClient.invalidateQueries({ queryKey: ['user', friendId] })
+    try {
+      if (isFriend) {
+        await api.put(`/api/friend/delete/${friendId}`)
+      } else {
+        await api.put(`/api/friend/set/${friendId}`)
+      }
+      refetch()
+    } catch {
+      /* ignore */
+    }
     setLoading(false)
   }
 
   return (
     <button
-      onClick={handleAdd}
+      onClick={handleToggle}
       disabled={loading}
-      className="bg-blue-600 text-white rounded px-3 py-1 text-sm hover:bg-blue-700 disabled:opacity-50"
+      className={`rounded px-3 py-1 text-sm disabled:opacity-50 ${
+        isFriend
+          ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          : 'bg-blue-600 text-white hover:bg-blue-700'
+      }`}
     >
-      {loading ? '...' : 'Добавить в друзья'}
+      {loading ? '...' : isFriend ? 'Удалить из друзей' : 'Добавить в друзья'}
     </button>
   )
 }
