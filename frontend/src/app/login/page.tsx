@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginPage() {
-  const [login, setLogin] = useState('')
+  const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const login = useAuth((s) => s.login)
@@ -16,7 +16,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     try {
-      await login(login, password)
+      await login(loginValue, password)
       router.push('/feed')
     } catch {
       setError('Неверные данные')
@@ -31,8 +31,8 @@ export default function LoginPage() {
         <input
           className="w-full border rounded px-3 py-2"
           placeholder="Логин"
-          value={login}
-          onChange={(e) => setLogin(e.target.value)}
+          value={loginValue}
+          onChange={(e) => setLoginValue(e.target.value)}
           required
         />
         <input

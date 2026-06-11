@@ -38,11 +38,11 @@ export const useAuth = create<AuthState>((set) => ({
     set({ token: token ?? null, userId: userId ?? null, loading: false })
   },
 
-  login: async (id, password) => {
+  login: async (login, password) => {
     const { data } = await api.post('/api/security/login', { login, password })
     document.cookie = `token=${data.access_token}; path=/; max-age=${data.expiresIn}`
-    document.cookie = `userId=${id}; path=/; max-age=${data.expiresIn}`
-    set({ token: data.access_token, userId: id })
+    document.cookie = `userId=${login}; path=/; max-age=${data.expiresIn}`
+    set({ token: data.access_token, userId: login })
   },
 
   register: async (body) => {
