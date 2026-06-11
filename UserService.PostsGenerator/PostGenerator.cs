@@ -1,50 +1,52 @@
-﻿using System.Text;
-using Libraries.NpgsqlService;
+﻿using Microsoft.EntityFrameworkCore;
+using UserService.Database;
+using UserService.Database.Entities;
 
 namespace UserService.PostsGenerator
 {
-    internal class PostGenerator(NpgsqlService npgsql)
+    internal class PostGenerator(UserDbContext context)
     {
-        private readonly NpgsqlService npgsql = npgsql;
-
         public async Task GeneratePostsAsync()
         {
-            var posts = await GePostsFromSourceFileAsync();
-            var all_users_ids = await npgsql.GetQueryResultAsync("select user_id from users", [], ["user_id"]);
-            Random rnd = new();
-            var sb = new StringBuilder();
+            var posts = await GetPostsFromSourceFileAsync();
+            var allUserIds = await context.Users.Select(u => u.User_id).ToListAsync();
+            var rnd = new Random();
             int cnt = 0;
-            foreach (var user_id in all_users_ids)
+
+            foreach (var userId in allUserIds)
             {
-                var posts_count = rnd.Next(1, 50);
-                for (int i = 0; i < posts_count; i++) 
+                var postsCount = rnd.Next(1, 50);
+                for (int i = 0; i < postsCount; i++)
                 {
                     var text = posts[rnd.Next(0, posts.Length - 1)].Trim();
-                    sb.Append($"insert into public.posts (post_id, user_id, post) values ('{Guid.NewGuid()}', '{user_id["user_id"]}', '{text}');\n");
+                    context.Posts.Add(new Post
+                    {
+                        Post_id = Guid.NewGuid(),
+                        User_id = userId,
+                        Text = text,
+                        Creation_datetime = DateTime.UtcNow
+                    });
                 }
-                if (cnt % 5000 == 0)
+
+                if (cnt % 500 == 0)
                 {
-                    await npgsql.ExecuteNonQueryAsync(sb.ToString(), []);
-                    sb.Clear();
+                    await context.SaveChangesAsync();
                 }
                 cnt++;
-                Console.WriteLine($"{cnt}/{all_users_ids.Count}");
+                Console.WriteLine($"{cnt}/{allUserIds.Count}");
             }
-            await npgsql.ExecuteNonQueryAsync(sb.ToString(), []);
-            sb.Clear();
-            //var rowCount = await npgsql.ExecuteNonQueryAsync(query, []);
-            Console.WriteLine(all_users_ids.Count);
+
+            await context.SaveChangesAsync();
+            Console.WriteLine(allUserIds.Count);
         }
 
-        private static async Task<string[]> GePostsFromSourceFileAsync()
+        private static async Task<string[]> GetPostsFromSourceFileAsync()
         {
             try
             {
                 using StreamReader reader = new("Source/posts.txt");
                 string text = await reader.ReadToEndAsync();
-                var query = new StringBuilder();
-                var lines = text.Split(".");
-                return lines;
+                return text.Split(".");
             }
             catch (IOException e)
             {

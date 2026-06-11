@@ -1,29 +1,28 @@
-﻿using Libraries.NpgsqlService;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
-using Npgsql;
-using NpgsqlTypes;
 using System.Text.Json;
+using UserService.Database;
 using UserService.Database.Entities;
 
 namespace UserService.CacheWarmup
 {
-    internal class CacheWarmuper(NpgsqlService npgsql, IDistributedCache distributedCache)
+    internal class CacheWarmuper(IDbContextFactory<UserDbContext> contextFactory, IDistributedCache distributedCache)
     {
-        private readonly NpgsqlService npgsql = npgsql;
-        private readonly IDistributedCache distributedCache = distributedCache;
         private readonly JsonSerializerOptions jsonSerializerOptions = new(JsonSerializerDefaults.Web);
 
         public async Task WarmupAsync()
         {
-            await CreateUserDbSchemaAsync();
-            var users_with_friends = await GetUsersWithFriendsAsync();
+            await using var context = await contextFactory.CreateDbContextAsync();
+            var users_with_friends = await context.Friends
+                .Select(f => f.User_id)
+                .Distinct()
+                .ToListAsync();
+
             foreach (var user_id in users_with_friends)
             {
-                var user_feed = await GetFeedAsync(user_id);
-                if (user_feed.Count == 0)
-                {
-                    continue;
-                }
+                var user_feed = await GetFeedAsync(context, user_id);
+                if (user_feed.Count == 0) continue;
+
                 string key = $"feed-{user_id}";
                 var cached_feed_json = await distributedCache.GetStringAsync(key);
                 var user_feed_json = JsonSerializer.Serialize(user_feed, jsonSerializerOptions);
@@ -42,85 +41,22 @@ namespace UserService.CacheWarmup
             Console.WriteLine("the end");
         }
 
-        private async Task<List<Guid>> GetUsersWithFriendsAsync()
+        private static async Task<List<Post>> GetFeedAsync(UserDbContext context, Guid user_id)
         {
-            string query = @"select distinct user_id from friends";
-            var data = await npgsql.GetQueryResultAsync(query, [], ["user_id"], TargetSessionAttributes.PreferStandby);
-            if (data.Count == 0) return [];
-            var posts = new List<Guid>();
-            foreach (var row in data)
-            {
-                posts.Add(Guid.Parse(row["user_id"].ToString()!));
-            }
+            var posts = await (from f in context.Friends
+                               join p in context.Posts on f.Friend_id equals p.User_id
+                               where f.User_id == user_id
+                               orderby p.Creation_datetime descending
+                               select new Post
+                               {
+                                   Post_id = p.Post_id,
+                                   User_id = p.User_id,
+                                   Text = p.Text,
+                                   Creation_datetime = p.Creation_datetime
+                               })
+                               .Take(1000)
+                               .ToListAsync();
             return posts;
-        }
-
-        private async Task<List<Post>> GetFeedAsync(Guid user_id)
-        {
-            string query = @"select p.user_id, p.post_id, p.creation_datetime, p.post 
-                             from friends f
-                             inner join posts p on f.friend_id = p.user_id
-                             where f.user_id = @User_id
-                             order by p.creation_datetime desc
-                             limit 1000";
-            var parameters = new NpgsqlParameter[]
-            {
-                new("User_id", NpgsqlDbType.Uuid) { Value = user_id }
-            };
-            var data = await npgsql.GetQueryResultAsync(query, parameters, ["user_id", "post", "creation_datetime", "post_id"], TargetSessionAttributes.PreferStandby);
-            if (data.Count == 0) return [];
-            var posts = new List<Post>();
-            foreach (var post in data)
-            {
-                posts.Add(new Post(post));
-            }
-            return posts;
-        }
-
-        private async Task CreateUserDbSchemaAsync()
-        {
-            var query = @"CREATE TABLE IF NOT EXISTS public.users
-                          (
-                              user_id uuid NOT NULL,
-                              first_name character varying(30) NOT NULL,
-                              second_name character varying(30) NOT NULL,
-                              birthdate character varying(11) NOT NULL,
-                              biography character varying(1000) NOT NULL,
-                              city character varying(255) NOT NULL,
-                              password character varying(255) NOT NULL,
-                              can_publish_messages bool not null default false,
-                              CONSTRAINT pk_users PRIMARY KEY (user_id)
-                          );
-                        CREATE INDEX IF NOT EXISTS users_fname_sname_idx ON public.users(first_name varchar_pattern_ops, second_name varchar_pattern_ops);
-                        CREATE TABLE IF NOT EXISTS public.friends 
-                        (
-	                        user_id uuid,
-	                        friend_id uuid,
-	                        PRIMARY KEY(user_id, friend_id),
-	                        FOREIGN KEY (user_id) REFERENCES users (user_id),
-	                        FOREIGN KEY (friend_id) REFERENCES users (user_id)
-                        );
-                        CREATE TABLE IF NOT EXISTS public.posts 
-                        (
-                            post_id uuid not null,
-	                        user_id uuid not null,
-	                        post varchar(2000) not null,
-                            creation_datetime timestamp not null default CURRENT_TIMESTAMP,
-	                        PRIMARY KEY(post_id),
-	                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                        );
-                        CREATE INDEX IF NOT EXISTS posts_userid_idx ON public.posts(user_id);
-                        CREATE TABLE IF NOT EXISTS public.feed_outbox 
-                        (
-                            id BIGSERIAL PRIMARY KEY,
-                            kafka_key TEXT NOT NULL,
-                            kafka_value TEXT NOT NULL,
-                            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                            processed_at TIMESTAMPTZ
-                        );";
-
-
-            await npgsql.ExecuteNonQueryAsync(query, []);
         }
     }
 }

@@ -1,119 +1,152 @@
-﻿using Libraries.NpgsqlService;
-using Npgsql;
-using NpgsqlTypes;
+﻿using Microsoft.EntityFrameworkCore;
 using UserService.Database.Entities;
 
 namespace UserService.Database
 {
-    public class PostRepository(INpgsqlService npgsqlService) : IPostRepository
+    public class PostRepository(UserDbContext context) : IPostRepository
     {
         public async Task<Guid> AddPostAsync(Guid user_id, string post, Guid postId, OutboxEntry[]? outboxEntries = null)
         {
-            var businessQuery = @"INSERT INTO public.posts (post_id, user_id, post)
-                                  VALUES (@Post_id, @User_id, @Post)";
-            var businessParams = new NpgsqlParameter[]
+            var postEntity = new Post
             {
-               new("Post_id", NpgsqlDbType.Uuid) { Value = postId },
-               new("User_id", NpgsqlDbType.Uuid) { Value = user_id },
-               new("Post", NpgsqlDbType.Varchar) { Value = post }
+                Post_id = postId,
+                User_id = user_id,
+                Text = post,
+                Creation_datetime = DateTime.UtcNow
             };
-            await ExecuteWithOutboxAsync(businessQuery, businessParams, outboxEntries);
+
+            if (outboxEntries is null || outboxEntries.Length == 0)
+            {
+                context.Posts.Add(postEntity);
+                await context.SaveChangesAsync();
+                return postId;
+            }
+
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            context.Posts.Add(postEntity);
+            foreach (var entry in outboxEntries)
+            {
+                context.FeedOutbox.Add(new FeedOutboxEntity
+                {
+                    Kafka_key = entry.KafkaKey,
+                    Kafka_value = entry.KafkaValue,
+                    Created_at = DateTime.UtcNow
+                });
+            }
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
             return postId;
         }
 
         public async Task UpdatePostAsync(Guid post_id, string post, Guid user_id, OutboxEntry[]? outboxEntries = null)
         {
-            var businessQuery = @"UPDATE public.posts
-                                  SET post = @Post
-                                  WHERE post_id = @Post_id and user_id = @User_id";
-            var businessParams = new NpgsqlParameter[]
+            var postEntity = await context.Posts
+                .FirstOrDefaultAsync(p => p.Post_id == post_id && p.User_id == user_id)
+                ?? throw new KeyNotFoundException($"Post {post_id} not found");
+
+            postEntity.Text = post;
+
+            if (outboxEntries is null || outboxEntries.Length == 0)
             {
-               new("Post_id", NpgsqlDbType.Uuid) { Value = post_id },
-               new("User_id", NpgsqlDbType.Uuid) { Value = user_id },
-               new("Post", NpgsqlDbType.Varchar) { Value = post }
-            };
-            await ExecuteWithOutboxAsync(businessQuery, businessParams, outboxEntries);
+                await context.SaveChangesAsync();
+                return;
+            }
+
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            foreach (var entry in outboxEntries)
+            {
+                context.FeedOutbox.Add(new FeedOutboxEntity
+                {
+                    Kafka_key = entry.KafkaKey,
+                    Kafka_value = entry.KafkaValue,
+                    Created_at = DateTime.UtcNow
+                });
+            }
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
 
         public async Task DeletePostAsync(Guid post_id, Guid user_id, OutboxEntry[]? outboxEntries = null)
         {
-            var businessQuery = @"DELETE FROM public.posts
-                                  WHERE post_id = @Post_id and user_id = @User_id";
-            var businessParams = new NpgsqlParameter[]
-            {
-               new("Post_id", NpgsqlDbType.Uuid) { Value = post_id },
-               new("User_id", NpgsqlDbType.Uuid) { Value = user_id }
-            };
-            await ExecuteWithOutboxAsync(businessQuery, businessParams, outboxEntries);
-        }
+            var postEntity = await context.Posts
+                .FirstOrDefaultAsync(p => p.Post_id == post_id && p.User_id == user_id)
+                ?? throw new KeyNotFoundException($"Post {post_id} not found");
 
-        private async Task ExecuteWithOutboxAsync(string businessQuery, NpgsqlParameter[] businessParams, OutboxEntry[]? outboxEntries)
-        {
+            context.Posts.Remove(postEntity);
+
             if (outboxEntries is null || outboxEntries.Length == 0)
             {
-                await npgsqlService.ExecuteNonQueryAsync(businessQuery, businessParams);
+                await context.SaveChangesAsync();
                 return;
             }
 
-            var queries = new List<string> { businessQuery };
-            var allParams = new List<NpgsqlParameter[]> { businessParams };
-
+            await using var transaction = await context.Database.BeginTransactionAsync();
             foreach (var entry in outboxEntries)
             {
-                queries.Add(@"INSERT INTO public.feed_outbox (kafka_key, kafka_value)
-                              VALUES (@Key, @Value)");
-                allParams.Add(new NpgsqlParameter[]
+                context.FeedOutbox.Add(new FeedOutboxEntity
                 {
-                    new("Key", NpgsqlDbType.Varchar) { Value = entry.KafkaKey },
-                    new("Value", NpgsqlDbType.Text) { Value = entry.KafkaValue }
+                    Kafka_key = entry.KafkaKey,
+                    Kafka_value = entry.KafkaValue,
+                    Created_at = DateTime.UtcNow
                 });
             }
-
-            await npgsqlService.ExecuteTransactionAsync(queries.ToArray(), allParams.ToArray());
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
 
         public async Task<Post?> GetPostAsync(Guid post_id)
         {
-            string query = @"SELECT p.user_id, p.post, p.creation_datetime, u.first_name, u.second_name
-                             FROM public.posts p
-                             JOIN public.users u ON p.user_id = u.user_id
-                             WHERE p.post_id = @Post_id";
-            var parameters = new NpgsqlParameter[]
-            {
-               new("Post_id", NpgsqlDbType.Uuid) { Value = post_id }
-            };
-            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["user_id", "post", "creation_datetime", "first_name", "second_name"], TargetSessionAttributes.PreferStandby);
-            if (data.Count == 0) return null;
-            return new Post(post_id, data[0]);
+            var post = await context.Posts
+                .Where(p => p.Post_id == post_id)
+                .Join(context.Users, p => p.User_id, u => u.User_id, (p, u) => new Post
+                {
+                    Post_id = p.Post_id,
+                    User_id = p.User_id,
+                    Text = p.Text,
+                    Creation_datetime = p.Creation_datetime,
+                    AuthorFirstName = u.First_name,
+                    AuthorSecondName = u.Second_name
+                })
+                .FirstOrDefaultAsync();
+            return post;
         }
 
         public async Task<List<Post>> GetFeedAsync(Guid user_id, int offset, int limit)
         {
-            string query = @"select p.user_id, p.post_id, p.creation_datetime, p.post, u.first_name, u.second_name
-                            from friends f
-                            inner join posts p on f.friend_id = p.user_id
-                            join public.users u on p.user_id = u.user_id
-                            where f.user_id = @User_id
-                            union all
-                            select p.user_id, p.post_id, p.creation_datetime, p.post, u.first_name, u.second_name
-                            from posts p
-                            join public.users u on p.user_id = u.user_id
-                            where p.user_id = @User_id
-                            order by creation_datetime desc
-                            limit @Limit offset @Offset";
-            var parameters = new NpgsqlParameter[]
-            {
-               new("User_id", NpgsqlDbType.Uuid) { Value = user_id },
-               new("Limit", NpgsqlDbType.Integer) { Value = limit },
-               new("Offset", NpgsqlDbType.Integer) { Value = offset }
-            };
-            var data = await npgsqlService.GetQueryResultAsync(query, parameters, ["user_id", "post", "creation_datetime", "post_id", "first_name", "second_name"], TargetSessionAttributes.PreferStandby);
-            if (data.Count == 0) return [];
-            var posts = new List<Post>();
-            foreach (var post in data)
-            {
-                posts.Add(new Post(post));
-            }
+            var friendPosts = from f in context.Friends
+                              join p in context.Posts on f.Friend_id equals p.User_id
+                              join u in context.Users on p.User_id equals u.User_id
+                              where f.User_id == user_id
+                              select new Post
+                              {
+                                  Post_id = p.Post_id,
+                                  User_id = p.User_id,
+                                  Text = p.Text,
+                                  Creation_datetime = p.Creation_datetime,
+                                  AuthorFirstName = u.First_name,
+                                  AuthorSecondName = u.Second_name
+                              };
+
+            var ownPosts = from p in context.Posts
+                           join u in context.Users on p.User_id equals u.User_id
+                           where p.User_id == user_id
+                           select new Post
+                           {
+                               Post_id = p.Post_id,
+                               User_id = p.User_id,
+                               Text = p.Text,
+                               Creation_datetime = p.Creation_datetime,
+                               AuthorFirstName = u.First_name,
+                               AuthorSecondName = u.Second_name
+                           };
+
+            var posts = await friendPosts
+                .Union(ownPosts)
+                .OrderByDescending(p => p.Creation_datetime)
+                .Skip(offset)
+                .Take(limit)
+                .ToListAsync();
+
             return posts;
         }
     }

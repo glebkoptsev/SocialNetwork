@@ -7,8 +7,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.API", "UserServ
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Libraries.Kafka", "Libraries.Kafka\Libraries.Kafka.csproj", "{F7BDD17F-B1F3-41EF-8738-D126F68C59A4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Libraries.NpgsqlService", "Libraries.NpgsqlService\Libraries.NpgsqlService.csproj", "{A78C5B80-E803-4939-93CA-96AAA20DE8D9}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.CacheWarmup", "UserService.CacheWarmup\UserService.CacheWarmup.csproj", "{6F6C4406-EF1A-4EA7-A5E1-94FD9BD87BB9}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.CacheUpdateService", "UserService.CacheUpdateService\UserService.CacheUpdateService.csproj", "{CB6B7018-2FDA-48A8-AB94-D0974BC4A2BC}"
@@ -45,10 +43,6 @@ Global
 		{F7BDD17F-B1F3-41EF-8738-D126F68C59A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F7BDD17F-B1F3-41EF-8738-D126F68C59A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F7BDD17F-B1F3-41EF-8738-D126F68C59A4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A78C5B80-E803-4939-93CA-96AAA20DE8D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A78C5B80-E803-4939-93CA-96AAA20DE8D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A78C5B80-E803-4939-93CA-96AAA20DE8D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A78C5B80-E803-4939-93CA-96AAA20DE8D9}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6F6C4406-EF1A-4EA7-A5E1-94FD9BD87BB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6F6C4406-EF1A-4EA7-A5E1-94FD9BD87BB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6F6C4406-EF1A-4EA7-A5E1-94FD9BD87BB9}.Release|Any CPU.ActiveCfg = Release|Any CPU

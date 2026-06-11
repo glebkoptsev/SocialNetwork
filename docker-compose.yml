@@ -5,7 +5,7 @@ networks:
     driver: bridge
 
 services:
-  # ── Databases ──────────────────────────────────────────────
+  # ── Database ────────────────────────────────────────────────
   postgres:
     container_name: sn_postgres
     image: postgres:16
@@ -13,31 +13,11 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P}
-      POSTGRES_DB: userdb
+      POSTGRES_DB: socialnetwork
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks:
-      main-network:
-        aliases:
-          - user_service_postgres
-          - user_service_postgres_slave_first
-          - user_service_postgres_slave_second
-    restart: unless-stopped
-
-  dialog_postgres:
-    container_name: sn_dialog_postgres
-    image: postgres:16
-    command: -c max_connections=200
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P}
-      POSTGRES_DB: dialogdb
-    ports:
-      - "5433:5432"
-    volumes:
-      - pgdialog:/var/lib/postgresql/data
     networks: [main-network]
     restart: unless-stopped
 
@@ -87,7 +67,7 @@ services:
       - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__postgres=Host=user_service_postgres:5432,user_service_postgres_slave_first:5432,user_service_postgres_slave_second:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
       - JwtSettings__Secret=${JWT_SECRET:-c8ea2ac5-0ca5-436b-af45-2033c4985a8a}
     depends_on: [postgres, redis, kafka]
     networks: [main-network]
@@ -102,9 +82,9 @@ services:
       - "5002:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__postgres=Host=dialog_postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=dialogdb
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
       - JwtSettings__Secret=${JWT_SECRET:-c8ea2ac5-0ca5-436b-af45-2033c4985a8a}
-    depends_on: [dialog_postgres, redis, user_api]
+    depends_on: [postgres, redis, user_api]
     networks: [main-network]
     restart: unless-stopped
 
@@ -129,7 +109,7 @@ services:
       dockerfile: UserService.CacheUpdateService/Dockerfile
     environment:
       - DOTNET_ENVIRONMENT=Production
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
       - AuthService__URL=http://user_api:8080/api/security/login
       - AuthService__Login=system
       - AuthService__Password=placeholder
@@ -158,7 +138,7 @@ services:
       context: .
       dockerfile: UserService.UsersGenerator/Dockerfile
     environment:
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
     depends_on: [postgres]
     networks: [main-network]
     profiles: [seed]
@@ -169,7 +149,7 @@ services:
       context: .
       dockerfile: UserService.PostsGenerator/Dockerfile
     environment:
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
     depends_on: [postgres]
     networks: [main-network]
     profiles: [seed]
@@ -180,7 +160,7 @@ services:
       context: .
       dockerfile: UserService.CacheWarmup/Dockerfile
     environment:
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=userdb
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
     depends_on: [postgres, redis]
     networks: [main-network]
     profiles: [seed]
@@ -203,5 +183,4 @@ services:
 
 volumes:
   pgdata:
-  pgdialog:
   redisdata:

@@ -1,17 +1,15 @@
 using Libraries.Kafka;
-using Libraries.NpgsqlService;
-using Libraries.NpgsqlService.Security;
 using Libraries.Web.Common.Caching;
 using Libraries.Web.Common.Middlewares;
+using Libraries.Web.Common.Security;
 using Libraries.Web.Common.Settings;
 using Libraries.Web.Common.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
-using Npgsql;
-using NpgsqlTypes;
 using StackExchange.Redis;
 using System.Threading.RateLimiting;
 using UserService.API.Services;
@@ -87,15 +85,20 @@ namespace UserService.API
                 options.Configuration = builder.Configuration.GetConnectionString("redis");
 #endif
             });
-            builder.Services.AddSingleton<INpgsqlService, NpgsqlService>();
             builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
             {
                 var connStr = builder.Configuration.GetConnectionString("redis");
                 return ConnectionMultiplexer.Connect(connStr!);
             });
             builder.Services.AddSingleton<IDistributedLock, RedisLock>();
+            builder.Services.AddDbContextPool<UserDbContext>(options =>
+            {
+                var connStr = builder.Configuration.GetConnectionString("postgres");
+                options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
+            });
             builder.Services.AddTransient<UsersService>();
             builder.Services.AddTransient<IFriendService, FriendService>();
+            builder.Services.AddTransient<FriendService>();
             builder.Services.AddTransient<IPostRepository, PostRepository>();
             builder.Services.AddTransient<PostService>();
             builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
@@ -113,73 +116,30 @@ namespace UserService.API
             app.UseAuthorization();
             app.MapControllers();
 
-            // Ensure database schema exists
-            var npgsql = app.Services.GetRequiredService<INpgsqlService>();
-            await npgsql.ExecuteNonQueryAsync("""
-                CREATE TABLE IF NOT EXISTS public.users
-                (
-                    user_id uuid NOT NULL,
-                    first_name character varying(30) NOT NULL,
-                    second_name character varying(30) NOT NULL,
-                    birthdate character varying(11) NOT NULL,
-                    biography character varying(1000) NOT NULL,
-                    city character varying(255) NOT NULL,
-                    password character varying(255) NOT NULL,
-                    can_publish_messages bool not null default false,
-                    login character varying(50) NOT NULL,
-                    CONSTRAINT pk_users PRIMARY KEY (user_id)
-                );
-                CREATE INDEX IF NOT EXISTS users_fname_sname_idx ON public.users(first_name varchar_pattern_ops, second_name varchar_pattern_ops);
-                CREATE TABLE IF NOT EXISTS public.friends
-                (
-                    user_id uuid,
-                    friend_id uuid,
-                    PRIMARY KEY(user_id, friend_id),
-                    FOREIGN KEY (user_id) REFERENCES users (user_id),
-                    FOREIGN KEY (friend_id) REFERENCES users (user_id)
-                );
-                CREATE TABLE IF NOT EXISTS public.posts
-                (
-                    post_id uuid not null,
-                    user_id uuid not null,
-                    post varchar(2000) not null,
-                    creation_datetime timestamp not null default CURRENT_TIMESTAMP,
-                    PRIMARY KEY(post_id),
-                    FOREIGN KEY (user_id) REFERENCES users (user_id)
-                );
-                CREATE INDEX IF NOT EXISTS posts_userid_idx ON public.posts(user_id);
-                CREATE TABLE IF NOT EXISTS public.feed_outbox
-                (
-                    id BIGSERIAL PRIMARY KEY,
-                    kafka_key TEXT NOT NULL,
-                    kafka_value TEXT NOT NULL,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    processed_at TIMESTAMPTZ
-                )
-                """, []);
+            // Apply migrations and seed system user
+            using (var scope = app.Services.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<UserDbContext>();
+                await context.Database.MigrateAsync();
 
-            // Add login column if upgrading from old schema
-            await npgsql.ExecuteNonQueryAsync("""
-                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS login VARCHAR(50) NOT NULL DEFAULT '';
-                CREATE UNIQUE INDEX IF NOT EXISTS users_login_idx ON public.users(login);
-                """, []);
-
-            // Create system user for internal services
-            var systemUserId = new Guid("00000000-0000-0000-0000-000000000000");
-            await npgsql.ExecuteNonQueryAsync("""
-                INSERT INTO public.users (user_id, first_name, second_name, birthdate, biography, city, password, login)
-                VALUES (@Id, 'System', 'User', '', '', '', @Password, 'system')
-                ON CONFLICT (user_id) DO NOTHING
-                """, [
-                new NpgsqlParameter("Id", NpgsqlDbType.Uuid) { Value = systemUserId },
-                new NpgsqlParameter("Password", NpgsqlDbType.Varchar) { Value = PasswordHasher.Hash("placeholder") }
-            ]);
-            // Update login for system user if row already existed before login column was added
-            await npgsql.ExecuteNonQueryAsync("""
-                UPDATE public.users SET login = 'system' WHERE user_id = @Id AND login = ''
-                """, [
-                new NpgsqlParameter("Id", NpgsqlDbType.Uuid) { Value = systemUserId }
-            ]);
+                // Create system user
+                var systemUserId = new Guid("00000000-0000-0000-0000-000000000000");
+                if (!await context.Users.AnyAsync(u => u.User_id == systemUserId))
+                {
+                    context.Users.Add(new UserService.Database.Entities.User
+                    {
+                        User_id = systemUserId,
+                        First_name = "System",
+                        Second_name = "User",
+                        Birthdate = "",
+                        Biography = "",
+                        City = "",
+                        Password = PasswordHasher.Hash("placeholder"),
+                        Login = "system"
+                    });
+                    await context.SaveChangesAsync();
+                }
+            }
 
             app.Run();
         }

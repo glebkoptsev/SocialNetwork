@@ -1,6 +1,7 @@
-﻿using Libraries.NpgsqlService;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using UserService.Database;
 
 namespace UserService.UsersGenerator
 {
@@ -19,7 +20,11 @@ namespace UserService.UsersGenerator
             return Host.CreateDefaultBuilder(args)
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services.AddScoped<NpgsqlService>();
+                    services.AddDbContext<UserDbContext>(options =>
+                    {
+                        var connStr = hostContext.Configuration["ConnectionStrings:postgres"];
+                        options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
+                    });
                     services.AddScoped<UsersGenerator>();
                 }).Build();
         }

@@ -11,7 +11,6 @@ WORKDIR /src
 COPY ["UserService.API/UserService.API.csproj", "UserService.API/"]
 COPY ["UserService.Database/UserService.Database.csproj", "UserService.Database/"]
 COPY ["Libraries.Kafka/Libraries.Kafka.csproj", "Libraries.Kafka/"]
-COPY ["Libraries.NpgsqlService/Libraries.NpgsqlService.csproj", "Libraries.NpgsqlService/"]
 COPY ["Libraries.Web.Common/Libraries.Web.Common.csproj", "Libraries.Web.Common/"]
 
 RUN dotnet restore "UserService.API/UserService.API.csproj"

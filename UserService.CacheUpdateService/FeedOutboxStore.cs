@@ -1,42 +1,29 @@
-using Libraries.NpgsqlService;
-using Npgsql;
-using NpgsqlTypes;
+using Microsoft.EntityFrameworkCore;
+using UserService.Database;
 
 namespace UserService.CacheUpdateService
 {
-    public class FeedOutboxStore(INpgsqlService npgsqlService) : IFeedOutboxStore
+    public class FeedOutboxStore(UserDbContext context) : IFeedOutboxStore
     {
         public async Task<IReadOnlyList<OutboxRecord>> GetUnprocessedAsync(int batchSize, CancellationToken ct)
         {
-            string query = @"SELECT id, kafka_key, kafka_value
-                             FROM public.feed_outbox
-                             WHERE processed_at IS NULL
-                             ORDER BY id ASC
-                             LIMIT @Limit";
-            var parameters = new NpgsqlParameter[]
-            {
-                new("Limit", NpgsqlDbType.Integer) { Value = batchSize }
-            };
-            var data = await npgsqlService.GetQueryResultAsync(query, parameters,
-                ["id", "kafka_key", "kafka_value"], TargetSessionAttributes.PreferStandby);
-
-            return data.Select(row => new OutboxRecord(
-                Id: Convert.ToInt64(row["id"]),
-                KafkaKey: row["kafka_key"].ToString()!,
-                KafkaValue: row["kafka_value"].ToString()!
-            )).ToList();
+            var records = await context.FeedOutbox
+                .Where(o => o.Processed_at == null)
+                .OrderBy(o => o.Id)
+                .Take(batchSize)
+                .Select(o => new OutboxRecord(o.Id, o.Kafka_key, o.Kafka_value))
+                .ToListAsync(ct);
+            return records;
         }
 
         public async Task MarkProcessedAsync(long id, CancellationToken ct)
         {
-            string query = @"UPDATE public.feed_outbox
-                             SET processed_at = NOW()
-                             WHERE id = @Id";
-            var parameters = new NpgsqlParameter[]
+            var record = await context.FeedOutbox.FirstOrDefaultAsync(o => o.Id == id, ct);
+            if (record is not null)
             {
-                new("Id", NpgsqlDbType.Bigint) { Value = id }
-            };
-            await npgsqlService.ExecuteNonQueryAsync(query, parameters);
+                record.Processed_at = DateTime.UtcNow;
+                await context.SaveChangesAsync(ct);
+            }
         }
     }
 }

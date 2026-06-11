@@ -1,7 +1,7 @@
 using Libraries.Clients.Common;
 using Libraries.Kafka;
-using Libraries.NpgsqlService;
 using Libraries.Web.Common.Caching;
+using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using UserService.Database;
 
@@ -18,8 +18,13 @@ namespace UserService.CacheUpdateService
                     services.AddOptions();
                     services.Configure<KafkaSettings>(hostContext.Configuration.GetSection("KafkaSettings"));
                     services.Configure<UserAuthServiceOptions>(hostContext.Configuration.GetSection("AuthService"));
-                    services.AddSingleton<INpgsqlService, NpgsqlService>();
-                    services.AddSingleton<IFeedOutboxStore, FeedOutboxStore>();
+                    services.AddDbContextFactory<UserDbContext>(options =>
+                    {
+                        var connStr = hostContext.Configuration.GetConnectionString("postgres");
+                        options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
+                    });
+                    services.AddTransient<IFeedOutboxStore, FeedOutboxStore>();
+                    services.AddTransient<IPostRepository, PostRepository>();
                     services.AddSingleton<IConnectionMultiplexer>(_ =>
                     {
                         var connStr = hostContext.Configuration.GetConnectionString("redis");
@@ -30,7 +35,6 @@ namespace UserService.CacheUpdateService
                     services.AddSingleton<KafkaClientHandle>();
                     services.AddHttpClient<UserAuthService>();
                     services.AddSingleton<UserAuthService>();
-                    services.AddTransient<PostRepository>();
                     services.AddStackExchangeRedisCache(options =>
                     {
 #if DEBUG
@@ -45,17 +49,12 @@ namespace UserService.CacheUpdateService
 
             var host = builder.Build();
 
-            // Ensure feed_outbox table exists
-            var npgsql = host.Services.GetRequiredService<INpgsqlService>();
-            await npgsql.ExecuteNonQueryAsync("""
-                CREATE TABLE IF NOT EXISTS public.feed_outbox (
-                    id BIGSERIAL PRIMARY KEY,
-                    kafka_key TEXT NOT NULL,
-                    kafka_value TEXT NOT NULL,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    processed_at TIMESTAMPTZ
-                )
-                """, []);
+            // Apply migrations
+            using (var scope = host.Services.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<UserDbContext>();
+                await context.Database.MigrateAsync();
+            }
 
             await host.RunAsync();
         }

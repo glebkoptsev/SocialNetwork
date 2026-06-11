@@ -13,16 +13,14 @@ using Libraries.Clients.Common;
 
 namespace UserService.CacheUpdateService
 {
-    public class Worker(IOptions<KafkaSettings> options, 
-        IDistributedCache cache, 
-        PostRepository postRepository, 
+    public class Worker(
+        IOptions<KafkaSettings> options,
+        IDistributedCache cache,
+        IServiceScopeFactory scopeFactory,
         IConfiguration configuration,
         UserAuthService userAuthService,
         IDistributedLock distributedLock) : BackgroundService
     {
-        private readonly IOptions<KafkaSettings> options = options;
-        private readonly IDistributedCache cache = cache;
-        private readonly UserAuthService userAuthService = userAuthService;
         private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
 
 #if DEBUG
@@ -105,7 +103,9 @@ namespace UserService.CacheUpdateService
                         }
                         else
                         {
-                            var post = await postRepository.GetPostAsync(message.Post_id.Value)
+                            using var scope = scopeFactory.CreateScope();
+                            var postRepo = scope.ServiceProvider.GetRequiredService<IPostRepository>();
+                            var post = await postRepo.GetPostAsync(message.Post_id.Value)
                                 ?? throw new Exception($"post {message.Post_id.Value} not found in db");
 
                             await ModifyCacheAsync(key, async (cached, _) =>
@@ -156,7 +156,9 @@ namespace UserService.CacheUpdateService
 
         private async Task ReloadFeedAsync(Guid user_id, string key, CancellationToken ct)
         {
-            var feedFromDb = await postRepository.GetFeedAsync(user_id, 0, 1000);
+            using var scope = scopeFactory.CreateScope();
+            var postRepo = scope.ServiceProvider.GetRequiredService<IPostRepository>();
+            var feedFromDb = await postRepo.GetFeedAsync(user_id, 0, 1000);
             await cache.SetStringAsync(key, JsonSerializer.Serialize(feedFromDb, jsonOptions), ct);
         }
 
@@ -175,8 +177,10 @@ namespace UserService.CacheUpdateService
             if (cachedFeedJson is null)
             {
                 Console.WriteLine($"Cache miss for {key}, reloading from DB");
+                using var scope = scopeFactory.CreateScope();
+                var postRepo = scope.ServiceProvider.GetRequiredService<IPostRepository>();
                 var userId = Guid.Parse(key.AsSpan(5));
-                cachedFeed = await postRepository.GetFeedAsync(userId, 0, 1000);
+                cachedFeed = await postRepo.GetFeedAsync(userId, 0, 1000);
             }
             else
             {

@@ -1,7 +1,8 @@
-﻿using Libraries.NpgsqlService;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using UserService.Database;
 
 namespace UserService.CacheWarmup
 {
@@ -20,7 +21,11 @@ namespace UserService.CacheWarmup
             return Host.CreateDefaultBuilder(args)
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services.AddScoped<NpgsqlService>();
+                    services.AddDbContextFactory<UserDbContext>(options =>
+                    {
+                        var connStr = hostContext.Configuration["ConnectionStrings:postgres"];
+                        options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
+                    });
                     services.AddScoped<CacheWarmuper>();
                     services.AddStackExchangeRedisCache(options =>
                     {

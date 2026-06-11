@@ -20,17 +20,21 @@ namespace UserService.API.Controllers
         }
 
         [HttpGet, Route("get/{id}"), Authorize]
-        public async Task<ActionResult<User>> GetUser(Guid id)
+        public async Task<ActionResult<User>> GetUser(string id)
         {
-            var user = await userService.GetUserAsync(id);
+            User? user;
+            if (Guid.TryParse(id, out var guid))
+                user = await userService.GetUserAsync(guid);
+            else
+                user = await userService.GetUserByLoginAsync(id);
             if (user is null) return NotFound();
             return Ok(user);
         }
 
         [HttpGet, Route("search"), Authorize]
-        public async Task<ActionResult<List<User>>> SearchUser([Required] string first_name, [Required] string second_name)
+        public async Task<ActionResult<List<User>>> SearchUser([Required] string first_name, string? second_name)
         {
-            var users = await userService.SearchUserAsync(first_name, second_name);
+            var users = await userService.SearchUserAsync(first_name, second_name ?? "");
             if (users is null) return NotFound();
             return Ok(users);
         }

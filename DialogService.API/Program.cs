@@ -1,15 +1,14 @@
 using DialogService.API.Services;
-using Libraries.NpgsqlService;
+using DialogService.Database;
 using Libraries.Web.Common.Clients;
 using Libraries.Web.Common.Middlewares;
 using Libraries.Web.Common.Settings;
 using Libraries.Web.Common.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
-using Npgsql;
-using NpgsqlTypes;
 
 namespace DialogService.API
 {
@@ -64,8 +63,12 @@ namespace DialogService.API
 
             builder.Services.AddHttpClient<UserServiceClient>();
             builder.Services.AddTransient<UserServiceClient>();
-            builder.Services.AddSingleton<NpgsqlService>();
             builder.Services.AddSingleton<IChatService, RedisChatService>();
+            builder.Services.AddDbContextPool<DialogDbContext>(options =>
+            {
+                var connStr = builder.Configuration.GetConnectionString("postgres");
+                options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
+            });
             builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
                 p.WithOrigins("http://localhost:3000")
                     .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
@@ -80,36 +83,12 @@ namespace DialogService.API
             app.UseAuthorization();
             app.MapControllers();
 
-            // Ensure dialog tables exist
-            var npgsql = app.Services.GetRequiredService<NpgsqlService>();
-            await npgsql.ExecuteNonQueryAsync("""
-                CREATE TABLE IF NOT EXISTS public.chats
-                (
-                    chat_id uuid NOT NULL,
-                    chat_name character varying(50) NOT NULL,
-                    creator_id uuid NOT NULL,
-                    creation_datetime timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    last_update_datetime timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT chats_pkey PRIMARY KEY (chat_id)
-                );
-                CREATE TABLE IF NOT EXISTS public.chat_users
-                (
-                    chat_id uuid NOT NULL,
-                    user_id uuid NOT NULL,
-                    creation_datetime timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT chat_users_pkey PRIMARY KEY (chat_id, user_id),
-                    CONSTRAINT chat_users_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.chats (chat_id)
-                );
-                CREATE TABLE IF NOT EXISTS public.messages
-                (
-                    message_id uuid NOT NULL,
-                    chat_id uuid NOT NULL,
-                    user_id uuid NOT NULL,
-                    message character varying(2000) NOT NULL,
-                    creation_datetime timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    CONSTRAINT messages_pkey PRIMARY KEY (message_id, chat_id)
-                )
-                """, []);
+            // Apply migrations
+            using (var scope = app.Services.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<DialogDbContext>();
+                await context.Database.MigrateAsync();
+            }
 
             app.Run();
         }

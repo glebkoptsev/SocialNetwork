@@ -8,7 +8,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["UserService.UsersGenerator/UserService.UsersGenerator.csproj", "UserService.UsersGenerator/"]
 COPY ["UserService.Database/UserService.Database.csproj", "UserService.Database/"]
-COPY ["Libraries.NpgsqlService/Libraries.NpgsqlService.csproj", "Libraries.NpgsqlService/"]
+COPY ["Libraries.Web.Common/Libraries.Web.Common.csproj", "Libraries.Web.Common/"]
 RUN dotnet restore "./UserService.UsersGenerator/UserService.UsersGenerator.csproj"
 COPY . .
 WORKDIR "/src/UserService.UsersGenerator"

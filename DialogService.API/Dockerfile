@@ -9,7 +9,6 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DialogService.API/DialogService.API.csproj", "DialogService.API/"]
 COPY ["DialogService.Database/DialogService.Database.csproj", "DialogService.Database/"]
-COPY ["Libraries.NpgsqlService/Libraries.NpgsqlService.csproj", "Libraries.NpgsqlService/"]
 COPY ["Libraries.Web.Common/Libraries.Web.Common.csproj", "Libraries.Web.Common/"]
 RUN dotnet restore "./DialogService.API/DialogService.API.csproj"
 COPY . .

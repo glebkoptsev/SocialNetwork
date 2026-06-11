@@ -5,17 +5,17 @@ using System.Text.Json;
 namespace UserService.CacheUpdateService
 {
     public class OutboxPublisher(
-        IFeedOutboxStore outboxStore,
+        IServiceScopeFactory scopeFactory,
         IKafkaProducer kafkaProducer) : BackgroundService
     {
-        private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
-
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
             while (!ct.IsCancellationRequested)
             {
                 try
                 {
+                    using var scope = scopeFactory.CreateScope();
+                    var outboxStore = scope.ServiceProvider.GetRequiredService<IFeedOutboxStore>();
                     var records = await outboxStore.GetUnprocessedAsync(100, ct);
                     if (records.Count == 0)
                     {

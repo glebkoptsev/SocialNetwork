@@ -1,4 +1,4 @@
-using Libraries.NpgsqlService.Security;
+using Libraries.Web.Common.Security;
 using Libraries.Web.Common.Settings;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -16,38 +16,29 @@ namespace UserService.API.Controllers
     [EnableRateLimiting("LoginPolicy")]
     public class SecurityController(UsersService userService, IOptions<JwtSettings> options) : ControllerBase
     {
-        private readonly UsersService userService = userService;
-        private readonly IOptions<JwtSettings> options = options;
-
         [HttpPost, Route("login")]
         public async Task<ActionResult<LoginResponse>> Login(LoginRequest request)
         {
             if (!ModelState.IsValid)
-            {
                 return BadRequest(ModelState);
-            }
 
             var user = await userService.GetUserByLoginAsync(request.Login);
-
             if (user is null)
                 return BadRequest("Bad credentials");
 
-            var verified = PasswordHasher.Check(user.Password, request.Password);
-            if (!verified)
-            {
+            if (!PasswordHasher.Check(user.Password, request.Password))
                 return BadRequest("Bad credentials");
-            }
 
             var claims = new ClaimsIdentity();
             claims.AddClaim(new(ClaimTypes.NameIdentifier, user.User_id.ToString()));
             claims.AddClaim(new(ClaimTypes.Name, user.First_name));
-            claims.AddClaim(new("can_publish_messages", user.CanPublishMessages?.ToString() ?? bool.FalseString));
+            claims.AddClaim(new("can_publish_messages", user.CanPublishMessages.ToString()));
 
             var expire = options.Value.TokenExpireSeconds;
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = claims,
-                Expires = DateTime.UtcNow.AddSeconds(options.Value.TokenExpireSeconds),
+                Expires = DateTime.UtcNow.AddSeconds(expire),
                 SigningCredentials = options.Value.GetSigningCredentials(),
                 Audience = options.Value.Audience,
                 Issuer = options.Value.Issuer

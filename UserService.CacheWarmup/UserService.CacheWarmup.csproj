@@ -20,7 +20,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\Libraries.NpgsqlService\Libraries.NpgsqlService.csproj" />
 	  <ProjectReference Include="..\UserService.Database\UserService.Database.csproj" />
 	</ItemGroup>
 
