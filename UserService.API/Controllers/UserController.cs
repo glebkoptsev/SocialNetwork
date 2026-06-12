@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using UserService.API.DTOs;
 using UserService.API.Services;
-using UserService.Database.Entities;
 
 namespace UserService.API.Controllers
 {
@@ -11,8 +10,6 @@ namespace UserService.API.Controllers
     [Route("api/user")]
     public class UserController(UsersService userService) : ControllerBase
     {
-        private readonly UsersService userService = userService;
-
         [HttpPost, Route("register")]
         public async Task<ActionResult<UserRegisterResponse>> Register(UserRegisterRequest request)
         {
@@ -20,23 +17,19 @@ namespace UserService.API.Controllers
         }
 
         [HttpGet, Route("get/{id}"), Authorize]
-        public async Task<ActionResult<User>> GetUser(string id)
+        public async Task<ActionResult<UserResponse>> GetUser(string id)
         {
-            User? user;
-            if (Guid.TryParse(id, out var guid))
-                user = await userService.GetUserAsync(guid);
-            else
-                user = await userService.GetUserByLoginAsync(id);
+            var guid = await userService.ResolveUserIdAsync(id);
+            if (guid == Guid.Empty) return NotFound();
+            var user = await userService.GetUserResponseAsync(guid);
             if (user is null) return NotFound();
             return Ok(user);
         }
 
         [HttpGet, Route("search"), Authorize]
-        public async Task<ActionResult<List<User>>> SearchUser([Required] string first_name, string? second_name)
+        public async Task<ActionResult<List<UserResponse>>> SearchUser([Required] string first_name, string? second_name)
         {
-            var users = await userService.SearchUserAsync(first_name, second_name ?? "");
-            if (users is null) return NotFound();
-            return Ok(users);
+            return Ok(await userService.SearchUserResponseAsync(first_name, second_name ?? ""));
         }
     }
 }

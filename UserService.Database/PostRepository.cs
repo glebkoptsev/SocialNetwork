@@ -111,6 +111,28 @@ namespace UserService.Database
             return post;
         }
 
+        public async Task<List<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit)
+        {
+            var userPosts = from p in context.Posts
+                            join u in context.Users on p.User_id equals u.User_id
+                            where p.User_id == author_id
+                            select new Post
+                            {
+                                Post_id = p.Post_id,
+                                User_id = p.User_id,
+                                Text = p.Text,
+                                Creation_datetime = p.Creation_datetime,
+                                AuthorFirstName = u.First_name,
+                                AuthorSecondName = u.Second_name
+                            };
+
+            return await userPosts
+                .OrderByDescending(p => p.Creation_datetime)
+                .Skip(offset)
+                .Take(limit)
+                .ToListAsync();
+        }
+
         public async Task<List<Post>> GetFeedAsync(Guid user_id, int offset, int limit)
         {
             var friendPosts = from f in context.Friends

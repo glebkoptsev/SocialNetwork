@@ -9,5 +9,6 @@ namespace UserService.Database
         Task DeletePostAsync(Guid post_id, Guid user_id, OutboxEntry[]? outboxEntries = null);
         Task<Post?> GetPostAsync(Guid post_id);
         Task<List<Post>> GetFeedAsync(Guid user_id, int offset, int limit);
+        Task<List<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit);
     }
 }

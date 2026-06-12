@@ -14,7 +14,7 @@ namespace UserService.API.Services
         public async Task<Guid> AddPostAsync(Guid user_id, string post)
         {
             var postId = Guid.NewGuid();
-            var friends = await friendService.GetFriendsAsync(user_id);
+            var friends = await friendService.GetFollowerIdsAsync(user_id);
             var outboxEntries = friends.Select(f => new OutboxEntry(
                 f.ToString(),
                 JsonSerializer.Serialize(
@@ -26,7 +26,7 @@ namespace UserService.API.Services
 
         public async Task UpdatePostAsync(Guid post_id, string post, Guid user_id)
         {
-            var friends = await friendService.GetFriendsAsync(user_id);
+            var friends = await friendService.GetFollowerIdsAsync(user_id);
             var outboxEntries = friends.Select(f => new OutboxEntry(
                 f.ToString(),
                 JsonSerializer.Serialize(
@@ -38,7 +38,7 @@ namespace UserService.API.Services
 
         public async Task DeletePostAsync(Guid post_id, Guid user_id)
         {
-            var friends = await friendService.GetFriendsAsync(user_id);
+            var friends = await friendService.GetFollowerIdsAsync(user_id);
             var outboxEntries = friends.Select(f => new OutboxEntry(
                 f.ToString(),
                 JsonSerializer.Serialize(
@@ -51,6 +51,11 @@ namespace UserService.API.Services
         public async Task<Post?> GetPostAsync(Guid post_id)
         {
             return await postRepo.GetPostAsync(post_id);
+        }
+
+        public async Task<IEnumerable<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit)
+        {
+            return await postRepo.GetUserPostsAsync(author_id, offset, limit);
         }
 
         public async Task<IEnumerable<Post>> GetFeedAsync(Guid user_id, int offset, int limit)

@@ -7,8 +7,8 @@ import { useQuery } from '@tanstack/react-query'
 export default function FriendButton({ userId, friendId }: { userId: string; friendId: string }) {
   const [loading, setLoading] = useState(false)
 
-  const { data: isFriend, refetch } = useQuery({
-    queryKey: ['friend-status', friendId],
+  const { data: isSubscribed, refetch } = useQuery({
+    queryKey: ['subscription-status', friendId],
     queryFn: () => api.get<boolean>(`/api/friend/status/${friendId}`).then((r) => r.data),
     enabled: userId !== friendId,
   })
@@ -18,7 +18,7 @@ export default function FriendButton({ userId, friendId }: { userId: string; fri
   const handleToggle = async () => {
     setLoading(true)
     try {
-      if (isFriend) {
+      if (isSubscribed) {
         await api.put(`/api/friend/delete/${friendId}`)
       } else {
         await api.put(`/api/friend/set/${friendId}`)
@@ -35,12 +35,12 @@ export default function FriendButton({ userId, friendId }: { userId: string; fri
       onClick={handleToggle}
       disabled={loading}
       className={`rounded px-3 py-1 text-sm disabled:opacity-50 ${
-        isFriend
+        isSubscribed
           ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           : 'bg-blue-600 text-white hover:bg-blue-700'
       }`}
     >
-      {loading ? '...' : isFriend ? 'Удалить из друзей' : 'Добавить в друзья'}
+      {loading ? '...' : isSubscribed ? 'Отписаться' : 'Подписаться'}
     </button>
   )
 }

@@ -9,33 +9,38 @@ namespace UserService.API.Controllers
 {
     [ApiController]
     [Route("api/post")]
-    public class PostController(PostService postService) : ControllerBase
+    public class PostController(PostService postService, UsersService usersService) : ControllerBase
     {
-        private readonly PostService postService = postService;
-
         [HttpGet, Route("get/{post_id}"), Authorize]
-        public async Task<ActionResult<Post>> GetPost(Guid post_id)
+        public async Task<ActionResult<PostResponse>> GetPost(Guid post_id)
         {
             var post = await postService.GetPostAsync(post_id);
-            return post is null
-                ? NotFound()
-                : Ok(post);
+            return post is null ? NotFound() : Ok(post.ToResponse());
         }
 
         [HttpGet, Route("feed"), Authorize]
-        public async Task<ActionResult<Post[]>> GetFeed(int offset = 0, int limit = 50)
+        public async Task<ActionResult<PostResponse[]>> GetFeed(int offset = 0, int limit = 50, string? user_id = null)
         {
-            var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
-            var posts = await postService.GetFeedAsync(currentUserId, offset, limit);
-            return Ok(posts);
+            IEnumerable<Post> posts;
+            if (user_id is not null)
+            {
+                var authorId = await usersService.ResolveUserIdAsync(user_id);
+                if (authorId == Guid.Empty) return NotFound();
+                posts = await postService.GetUserPostsAsync(authorId, offset, limit);
+            }
+            else
+            {
+                var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
+                posts = await postService.GetFeedAsync(currentUserId, offset, limit);
+            }
+            return Ok(posts.Select(p => p.ToResponse()).ToArray());
         }
 
         [HttpPost, Route("create"), Authorize]
         public async Task<ActionResult<Guid>> AddPost([FromBody] AddPostRequest request)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
-            var guid = await postService.AddPostAsync(currentUserId, request.Text);
-            return Ok(guid);
+            return Ok(await postService.AddPostAsync(currentUserId, request.Text));
         }
 
         [HttpDelete, Route("delete/{post_id}"), Authorize]
@@ -47,7 +52,7 @@ namespace UserService.API.Controllers
         }
 
         [HttpPut, Route("update/{post_id}"), Authorize]
-        public async Task<IActionResult> DeletePost(Guid post_id, [FromBody] AddPostRequest request)
+        public async Task<IActionResult> UpdatePost(Guid post_id, [FromBody] AddPostRequest request)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
             await postService.UpdatePostAsync(post_id, request.Text, currentUserId);

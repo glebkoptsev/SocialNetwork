@@ -52,7 +52,7 @@ namespace UserService.API.Services
             return await context.Friends.AnyAsync(f => f.User_id == user_id && f.Friend_id == friend_id);
         }
 
-        public async Task<List<Guid>> GetFriendsAsync(Guid user_id)
+        public async Task<List<Guid>> GetFollowerIdsAsync(Guid user_id)
         {
             var friendIds = await context.Friends
                 .Where(f => f.Friend_id == user_id)
