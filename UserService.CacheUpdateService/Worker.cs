@@ -47,10 +47,12 @@ namespace UserService.CacheUpdateService
                         .WithUrl(signalrHost, x => x.AccessTokenProvider = () => Task.FromResult<string?>(token))
                         .Build();
                     await connection.StartAsync(ct);
+                    Console.WriteLine("Connected to SignalR hub");
                     break;
                 }
-                catch
+                catch (Exception e)
                 {
+                    Console.WriteLine($"SignalR connection failed: {e.Message}");
                     await Task.Delay(TimeSpan.FromSeconds(10), ct);
                 }
             }
@@ -211,7 +213,7 @@ namespace UserService.CacheUpdateService
                     Console.WriteLine($"Топик {topic} создан");
                     return;
                 }
-                catch (CreateTopicsException e) when (e.Error.Code == ErrorCode.TopicAlreadyExists)
+                catch (CreateTopicsException e) when (e.Results.Any(r => r.Error.Code == ErrorCode.TopicAlreadyExists))
                 {
                     Console.WriteLine($"Топик {topic} уже существует");
                     return;
@@ -234,6 +236,8 @@ namespace UserService.CacheUpdateService
                 EnableAutoCommit = true,
                 EnablePartitionEof = true,
                 AutoOffsetReset = AutoOffsetReset.Earliest,
+                SocketConnectionSetupTimeoutMs = 10000,
+                ReconnectBackoffMaxMs = 5000,
 #if DEBUG
                 BootstrapServers = options.Value.Host_debug,
 #else

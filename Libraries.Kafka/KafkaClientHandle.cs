@@ -5,28 +5,36 @@ namespace Libraries.Kafka
 {
     public class KafkaClientHandle
     {
-        private readonly IProducer<byte[], byte[]> kafkaProducer;
+        private readonly Lazy<IProducer<byte[], byte[]>> kafkaProducer;
 
         public KafkaClientHandle(IOptions<KafkaSettings> config)
         {
-            var conf = new ProducerConfig
+            kafkaProducer = new Lazy<IProducer<byte[], byte[]>>(() =>
             {
-                ClientId = "dotnet producer",
+                var conf = new ProducerConfig
+                {
+                    ClientId = "dotnet producer",
+                    SocketConnectionSetupTimeoutMs = 10000,
+                    ReconnectBackoffMaxMs = 5000,
 #if DEBUG
-                BootstrapServers = config.Value.Host_debug,
+                    BootstrapServers = config.Value.Host_debug,
 #else
-                BootstrapServers = config.Value.Host,
+                    BootstrapServers = config.Value.Host,
 #endif
-            };
-            kafkaProducer = new ProducerBuilder<byte[], byte[]>(conf).Build();
+                };
+                return new ProducerBuilder<byte[], byte[]>(conf).Build();
+            });
         }
 
-        public Handle Handle { get => kafkaProducer.Handle; }
+        public Handle Handle { get => kafkaProducer.Value.Handle; }
 
         public void Dispose()
         {
-            kafkaProducer.Flush();
-            kafkaProducer.Dispose();
+            if (kafkaProducer.IsValueCreated)
+            {
+                kafkaProducer.Value.Flush();
+                kafkaProducer.Value.Dispose();
+            }
         }
     }
 }
