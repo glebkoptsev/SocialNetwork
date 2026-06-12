@@ -55,10 +55,23 @@ namespace UserService.API.Services
             return user?.ToResponse();
         }
 
-        public async Task<List<UserResponse>> SearchUserResponseAsync(string first_name, string second_name)
+        public async Task<List<UserResponse>> SearchUserResponseAsync(string query, int offset, int limit)
         {
-            var users = await SearchUserAsync(first_name, second_name);
+            var users = await SearchUserAsync(query, offset, limit);
             return users.Select(u => u.ToResponse()).ToList();
+        }
+
+        public async Task<List<User>> SearchUserAsync(string query, int offset, int limit)
+        {
+            var q = "%" + query + "%";
+            var users = await context.Users
+                .Where(u => EF.Functions.ILike(
+                    u.First_name + " " + u.Second_name + " " + u.Login, q))
+                .OrderBy(u => u.User_id)
+                .Skip(offset)
+                .Take(limit)
+                .ToListAsync();
+            return users;
         }
 
         public async Task<List<UserResponse>> GetSubscriptionsResponseAsync(Guid userId)
@@ -85,15 +98,6 @@ namespace UserService.API.Services
                 .Where(u => ids.Contains(u.User_id))
                 .Select(u => u.ToResponse())
                 .ToListAsync();
-        }
-
-        public async Task<List<User>> SearchUserAsync(string first_name, string second_name)
-        {
-            var users = await context.Users
-                .Where(u => EF.Functions.Like(u.First_name.ToLower(), first_name.ToLower() + "%") && EF.Functions.Like(u.Second_name.ToLower(), second_name.ToLower() + "%"))
-                .OrderBy(u => u.User_id)
-                .ToListAsync();
-            return users;
         }
     }
 }

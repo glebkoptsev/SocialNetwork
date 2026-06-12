@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -8,6 +9,8 @@ import { Post as PostType, User } from '@/types'
 import PostCard from '@/components/PostCard'
 import FriendButton from '@/components/FriendButton'
 import { useAuth } from '@/lib/auth'
+
+const PAGE_SIZE = 20
 
 export default function UserPage() {
   const { id } = useParams()
@@ -30,14 +33,55 @@ export default function UserPage() {
       api.get<User[]>('/api/friend/followers', { params: { user_id: id } }).then((r) => r.data),
   })
 
-  const { data: posts } = useQuery({
-    queryKey: ['user-posts', id],
-    queryFn: () =>
-      api.get<PostType[]>('/api/post/feed', {
-        params: { offset: 0, limit: 100, user_id: id },
-      }).then((r) => r.data),
-    enabled: !!user,
-  })
+  const [posts, setPosts] = useState<PostType[]>([])
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const loadingRef = useRef(false)
+
+  const loadPosts = useCallback(async (off: number, append: boolean) => {
+    loadingRef.current = true
+    setLoading(true)
+    try {
+      const { data } = await api.get<PostType[]>('/api/post/feed', {
+        params: { offset: off, limit: PAGE_SIZE, user_id: id },
+      })
+      if (append) {
+        setPosts(prev => [...prev, ...data])
+      } else {
+        setPosts(data)
+      }
+      setHasMore(data.length === PAGE_SIZE)
+      setOffset(off + data.length)
+    } catch {
+      if (!append) setPosts([])
+      setHasMore(false)
+    }
+    loadingRef.current = false
+    setLoading(false)
+  }, [id])
+
+  useEffect(() => {
+    if (!user) return
+    loadPosts(0, false)
+  }, [user, loadPosts])
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+          loadPosts(offset, true)
+        }
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, offset, loadPosts])
 
   if (!user) return <p className="text-gray-400 text-center">Загрузка...</p>
 
@@ -86,9 +130,11 @@ export default function UserPage() {
         </div>
       )}
 
-      {posts?.map((post) => (
+      {posts.map((post) => (
         <PostCard key={post.post_id} post={post} />
       ))}
+      {loading && <p className="text-gray-400 text-center">Загрузка...</p>}
+      {!loading && hasMore && <div ref={sentinelRef} className="h-4" />}
     </div>
   )
 }

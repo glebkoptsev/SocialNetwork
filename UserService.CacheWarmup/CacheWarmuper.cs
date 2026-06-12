@@ -45,6 +45,7 @@ namespace UserService.CacheWarmup
         {
             var posts = await (from f in context.Friends
                                join p in context.Posts on f.Friend_id equals p.User_id
+                               join u in context.Users on p.User_id equals u.User_id
                                where f.User_id == user_id
                                orderby p.Creation_datetime descending
                                select new Post
@@ -52,7 +53,9 @@ namespace UserService.CacheWarmup
                                    Post_id = p.Post_id,
                                    User_id = p.User_id,
                                    Text = p.Text,
-                                   Creation_datetime = p.Creation_datetime
+                                   Creation_datetime = p.Creation_datetime,
+                                   AuthorFirstName = u.First_name,
+                                   AuthorSecondName = u.Second_name
                                })
                                .Take(1000)
                                .ToListAsync();

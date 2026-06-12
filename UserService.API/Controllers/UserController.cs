@@ -27,9 +27,10 @@ namespace UserService.API.Controllers
         }
 
         [HttpGet, Route("search"), Authorize]
-        public async Task<ActionResult<List<UserResponse>>> SearchUser([Required] string first_name, string? second_name)
+        public async Task<ActionResult<List<UserResponse>>> SearchUser(
+            [Required] string query, int offset = 0, int limit = 20)
         {
-            return Ok(await userService.SearchUserResponseAsync(first_name, second_name ?? ""));
+            return Ok(await userService.SearchUserResponseAsync(query, offset, limit));
         }
     }
 }
