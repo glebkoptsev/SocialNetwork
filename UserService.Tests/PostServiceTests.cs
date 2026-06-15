@@ -23,68 +23,43 @@ public class PostServiceTests
     }
 
     [Fact]
-    public async Task AddPostAsync_ReturnsPostId_AndNotifiesFriends()
+    public async Task AddPostAsync_ReturnsPostId_AndCreatesOneOutboxEntry()
     {
         var userId = Guid.NewGuid();
-        var friends = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() };
 
         _repoMock
-            .Setup(x => x.AddPostAsync(It.IsAny<Guid>(), "Hello", It.IsAny<Guid>(), It.IsAny<OutboxEntry[]>()))
-            .ReturnsAsync((Guid uid, string _, Guid pid, OutboxEntry[] _) => pid);
-        _friendMock.Setup(x => x.GetFriendsAsync(userId)).ReturnsAsync(friends);
+            .Setup(x => x.AddPostAsync(It.IsAny<Guid>(), "Hello", It.IsAny<Guid>(), It.IsAny<OutboxEntry?>()))
+            .ReturnsAsync((Guid uid, string _, Guid pid, OutboxEntry? _) => pid);
 
         var result = await _service.AddPostAsync(userId, "Hello");
 
         Assert.NotEqual(Guid.Empty, result);
         _repoMock.Verify(x => x.AddPostAsync(userId, "Hello", result,
-            It.Is<OutboxEntry[]>(o => o.Length == friends.Count)), Times.Once);
+            It.Is<OutboxEntry?>(o => o != null)), Times.Once);
     }
 
     [Fact]
-    public async Task AddPostAsync_NoFriends_DoesNotProduceMessages()
-    {
-        var userId = Guid.NewGuid();
-
-        _repoMock
-            .Setup(x => x.AddPostAsync(It.IsAny<Guid>(), "Alone", It.IsAny<Guid>(), It.IsAny<OutboxEntry[]>()))
-            .ReturnsAsync((Guid uid, string _, Guid pid, OutboxEntry[] o) => pid);
-        _friendMock.Setup(x => x.GetFriendsAsync(userId)).ReturnsAsync(new List<Guid>());
-
-        var result = await _service.AddPostAsync(userId, "Alone");
-
-        Assert.NotEqual(Guid.Empty, result);
-        _repoMock.Verify(x => x.AddPostAsync(userId, "Alone", result,
-            It.Is<OutboxEntry[]>(o => o.Length == 0)), Times.Once);
-    }
-
-    [Fact]
-    public async Task UpdatePostAsync_UpdatesAndNotifiesFriends()
+    public async Task UpdatePostAsync_UpdatesAndCreatesOneOutboxEntry()
     {
         var userId = Guid.NewGuid();
         var postId = Guid.NewGuid();
-        var friends = new List<Guid> { Guid.NewGuid() };
-
-        _friendMock.Setup(x => x.GetFriendsAsync(userId)).ReturnsAsync(friends);
 
         await _service.UpdatePostAsync(postId, "Updated", userId);
 
         _repoMock.Verify(x => x.UpdatePostAsync(postId, "Updated", userId,
-            It.Is<OutboxEntry[]>(o => o.Length == 1)), Times.Once);
+            It.Is<OutboxEntry?>(o => o != null)), Times.Once);
     }
 
     [Fact]
-    public async Task DeletePostAsync_DeletesAndNotifiesFriends()
+    public async Task DeletePostAsync_DeletesAndCreatesOneOutboxEntry()
     {
         var userId = Guid.NewGuid();
         var postId = Guid.NewGuid();
-        var friends = new List<Guid> { Guid.NewGuid() };
-
-        _friendMock.Setup(x => x.GetFriendsAsync(userId)).ReturnsAsync(friends);
 
         await _service.DeletePostAsync(postId, userId);
 
         _repoMock.Verify(x => x.DeletePostAsync(postId, userId,
-            It.Is<OutboxEntry[]>(o => o.Length == 1)), Times.Once);
+            It.Is<OutboxEntry?>(o => o != null)), Times.Once);
     }
 
     [Fact]

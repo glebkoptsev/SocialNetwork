@@ -1,5 +1,4 @@
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
-RUN apt-get update && apt-get install -y libkrb5-3 && rm -rf /var/lib/apt/lists/*
 USER app
 WORKDIR /app
 
@@ -8,7 +7,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["UserService.CacheUpdateService/UserService.CacheUpdateService.csproj", "UserService.CacheUpdateService/"]
 COPY ["UserService.Database/UserService.Database.csproj", "UserService.Database/"]
-COPY ["Libraries.Kafka/Libraries.Kafka.csproj", "Libraries.Kafka/"]
+COPY ["Libraries.RabbitMQ/Libraries.RabbitMQ.csproj", "Libraries.RabbitMQ/"]
 COPY ["Libraries.Clients.Common/Libraries.Clients.Common.csproj", "Libraries.Clients.Common/"]
 COPY ["Libraries.Web.Common/Libraries.Web.Common.csproj", "Libraries.Web.Common/"]
 RUN dotnet restore "./UserService.CacheUpdateService/UserService.CacheUpdateService.csproj"

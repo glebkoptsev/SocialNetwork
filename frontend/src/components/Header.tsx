@@ -18,6 +18,7 @@ export default function Header() {
           <Link href="/feed" className="text-sm hover:text-blue-600">Лента</Link>
           <Link href="/search" className="text-sm hover:text-blue-600">Поиск</Link>
           <Link href="/dialog" className="text-sm hover:text-blue-600">Сообщения</Link>
+          <Link href="/settings" className="text-sm hover:text-blue-600">Настройки</Link>
         </div>
         <div className="flex items-center gap-4">
           <Link href={`/user/${userId}`} className="text-sm hover:text-blue-600">Профиль</Link>

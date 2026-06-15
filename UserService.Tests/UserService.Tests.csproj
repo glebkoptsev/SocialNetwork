@@ -8,8 +8,8 @@
     <CollectCoverage>true</CollectCoverage>
     <CoverletOutputFormat>cobertura</CoverletOutputFormat>
     <CoverletOutput>$(MSBuildProjectDirectory)/TestResults/coverage.cobertura.xml</CoverletOutput>
-    <Include>[UserService.API]*,[UserService.Database]*,[Libraries.NpgsqlService]*,[Libraries.Kafka]*,[Libraries.Web.Common]*</Include>
-    <ExcludeByFile>**/Program.cs,**/Consts.cs,**/*Controller.cs,**/KafkaClientHandle.cs,**/NpgsqlService.cs,**/RequestLoggingMiddleware.cs,**/Clients/*.cs,**/RequestLog.cs,**/KafkaSettings.cs,**/KafkaProducer.cs</ExcludeByFile>
+    <Include>[UserService.API]*,[UserService.Database]*,[Libraries.RabbitMQ]*,[Libraries.Web.Common]*</Include>
+    <ExcludeByFile>**/Program.cs,**/Consts.cs,**/*Controller.cs,**/RabbitMQPublisher.cs,**/RabbitMQInitializer.cs,**/RequestLoggingMiddleware.cs,**/Clients/*.cs,**/RequestLog.cs</ExcludeByFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,8 +33,7 @@
   <ItemGroup>
     <ProjectReference Include="..\UserService.API\UserService.API.csproj" />
     <ProjectReference Include="..\UserService.Database\UserService.Database.csproj" />
-    <ProjectReference Include="..\Libraries.NpgsqlService\Libraries.NpgsqlService.csproj" />
-    <ProjectReference Include="..\Libraries.Kafka\Libraries.Kafka.csproj" />
+    <ProjectReference Include="..\Libraries.RabbitMQ\Libraries.RabbitMQ.csproj" />
     <ProjectReference Include="..\Libraries.Web.Common\Libraries.Web.Common.csproj" />
   </ItemGroup>
 

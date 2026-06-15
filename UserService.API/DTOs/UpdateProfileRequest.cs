@@ -1,14 +1,12 @@
 namespace UserService.API.DTOs
 {
-    public class UserResponse
+    public class UpdateProfileRequest
     {
-        public Guid User_id { get; set; }
         public string First_name { get; set; } = null!;
         public string Second_name { get; set; } = null!;
         public string Birthdate { get; set; } = null!;
         public string Biography { get; set; } = null!;
         public string City { get; set; } = null!;
-        public string Login { get; set; } = null!;
-        public int Who_can_message { get; set; }
+        public int Who_can_message { get; set; } = 0;
     }
 }

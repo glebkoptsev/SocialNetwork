@@ -14,7 +14,8 @@ namespace UserService.API.DTOs
                 Birthdate = user.Birthdate,
                 Biography = user.Biography,
                 City = user.City,
-                Login = user.Login
+                Login = user.Login,
+                Who_can_message = user.Who_can_message
             };
         }
 

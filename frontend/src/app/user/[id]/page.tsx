@@ -93,7 +93,14 @@ export default function UserPage() {
         </h1>
         <p className="text-sm text-gray-500">{user.city}</p>
         {user.biography && <p className="text-sm">{user.biography}</p>}
-        <FriendButton userId={userId!} friendId={id as string} />
+        <div className="flex gap-2 items-center">
+          <FriendButton userId={userId!} friendId={id as string} />
+          {userId === id && (
+            <Link href="/settings" className="text-sm text-blue-600 hover:underline">
+              Редактировать
+            </Link>
+          )}
+        </div>
       </div>
 
       {subscriptions && subscriptions.length > 0 && (

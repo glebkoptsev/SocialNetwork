@@ -5,7 +5,7 @@ namespace UserService.Database
 {
     public class PostRepository(UserDbContext context) : IPostRepository
     {
-        public async Task<Guid> AddPostAsync(Guid user_id, string post, Guid postId, OutboxEntry[]? outboxEntries = null)
+        public async Task<Guid> AddPostAsync(Guid user_id, string post, Guid postId, OutboxEntry? outboxEntry = null)
         {
             var postEntity = new Post
             {
@@ -15,7 +15,7 @@ namespace UserService.Database
                 Creation_datetime = DateTime.UtcNow
             };
 
-            if (outboxEntries is null || outboxEntries.Length == 0)
+            if (outboxEntry is null)
             {
                 context.Posts.Add(postEntity);
                 await context.SaveChangesAsync();
@@ -24,21 +24,18 @@ namespace UserService.Database
 
             await using var transaction = await context.Database.BeginTransactionAsync();
             context.Posts.Add(postEntity);
-            foreach (var entry in outboxEntries)
+            context.FeedOutbox.Add(new FeedOutboxEntity
             {
-                context.FeedOutbox.Add(new FeedOutboxEntity
-                {
-                    Kafka_key = entry.KafkaKey,
-                    Kafka_value = entry.KafkaValue,
-                    Created_at = DateTime.UtcNow
-                });
-            }
+                Kafka_key = outboxEntry.KafkaKey,
+                Kafka_value = outboxEntry.KafkaValue,
+                Created_at = DateTime.UtcNow
+            });
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
             return postId;
         }
 
-        public async Task UpdatePostAsync(Guid post_id, string post, Guid user_id, OutboxEntry[]? outboxEntries = null)
+        public async Task UpdatePostAsync(Guid post_id, string post, Guid user_id, OutboxEntry? outboxEntry = null)
         {
             var postEntity = await context.Posts
                 .FirstOrDefaultAsync(p => p.Post_id == post_id && p.User_id == user_id)
@@ -46,27 +43,24 @@ namespace UserService.Database
 
             postEntity.Text = post;
 
-            if (outboxEntries is null || outboxEntries.Length == 0)
+            if (outboxEntry is null)
             {
                 await context.SaveChangesAsync();
                 return;
             }
 
             await using var transaction = await context.Database.BeginTransactionAsync();
-            foreach (var entry in outboxEntries)
+            context.FeedOutbox.Add(new FeedOutboxEntity
             {
-                context.FeedOutbox.Add(new FeedOutboxEntity
-                {
-                    Kafka_key = entry.KafkaKey,
-                    Kafka_value = entry.KafkaValue,
-                    Created_at = DateTime.UtcNow
-                });
-            }
+                Kafka_key = outboxEntry.KafkaKey,
+                Kafka_value = outboxEntry.KafkaValue,
+                Created_at = DateTime.UtcNow
+            });
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
         }
 
-        public async Task DeletePostAsync(Guid post_id, Guid user_id, OutboxEntry[]? outboxEntries = null)
+        public async Task DeletePostAsync(Guid post_id, Guid user_id, OutboxEntry? outboxEntry = null)
         {
             var postEntity = await context.Posts
                 .FirstOrDefaultAsync(p => p.Post_id == post_id && p.User_id == user_id)
@@ -74,22 +68,19 @@ namespace UserService.Database
 
             context.Posts.Remove(postEntity);
 
-            if (outboxEntries is null || outboxEntries.Length == 0)
+            if (outboxEntry is null)
             {
                 await context.SaveChangesAsync();
                 return;
             }
 
             await using var transaction = await context.Database.BeginTransactionAsync();
-            foreach (var entry in outboxEntries)
+            context.FeedOutbox.Add(new FeedOutboxEntity
             {
-                context.FeedOutbox.Add(new FeedOutboxEntity
-                {
-                    Kafka_key = entry.KafkaKey,
-                    Kafka_value = entry.KafkaValue,
-                    Created_at = DateTime.UtcNow
-                });
-            }
+                Kafka_key = outboxEntry.KafkaKey,
+                Kafka_value = outboxEntry.KafkaValue,
+                Created_at = DateTime.UtcNow
+            });
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
         }

@@ -26,6 +26,7 @@ namespace UserService.Database
                 e.Property(u => u.City).HasMaxLength(255);
                 e.Property(u => u.Password).HasMaxLength(255);
                 e.Property(u => u.Login).HasMaxLength(50);
+                e.Property(u => u.Who_can_message).HasDefaultValue(0);
                 e.HasIndex(u => u.Login).IsUnique().HasDatabaseName("users_login_idx");
                 e.HasIndex(u => new { u.First_name, u.Second_name })
                     .HasDatabaseName("users_fname_sname_idx")

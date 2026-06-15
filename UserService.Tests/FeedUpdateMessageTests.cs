@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Libraries.Kafka.DTOs;
+using Libraries.Web.Common.DTOs;
 
 namespace UserService.Tests;
 

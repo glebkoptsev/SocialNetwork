@@ -5,7 +5,7 @@ VisualStudioVersion = 17.10.35013.160
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.API", "UserService.API\UserService.API.csproj", "{0678F3B8-38F9-4AA4-9AF9-F15F78055384}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Libraries.Kafka", "Libraries.Kafka\Libraries.Kafka.csproj", "{F7BDD17F-B1F3-41EF-8738-D126F68C59A4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Libraries.RabbitMQ", "Libraries.RabbitMQ\Libraries.RabbitMQ.csproj", "{F7BDD17F-B1F3-41EF-8738-D126F68C59A4}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserService.CacheWarmup", "UserService.CacheWarmup\UserService.CacheWarmup.csproj", "{6F6C4406-EF1A-4EA7-A5E1-94FD9BD87BB9}"
 EndProject

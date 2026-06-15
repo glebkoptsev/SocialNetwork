@@ -1,4 +1,4 @@
-using Libraries.Kafka;
+using Libraries.RabbitMQ;
 using Libraries.Web.Common.Caching;
 using Libraries.Web.Common.Middlewares;
 using Libraries.Web.Common.Security;
@@ -24,7 +24,7 @@ namespace UserService.API
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddOptions();
             builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
-            builder.Services.Configure<KafkaSettings>(builder.Configuration.GetSection("KafkaSettings"));
+            builder.Services.Configure<RabbitMQSettings>(builder.Configuration.GetSection("RabbitMQSettings"));
             builder.Services.AddAuthentication(o =>
             {
                 o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

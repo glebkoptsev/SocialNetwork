@@ -31,27 +31,18 @@ services:
     networks: [main-network]
     restart: unless-stopped
 
-  # ── Kafka (KRaft mode, no ZooKeeper) ───────────────────────
-  kafka:
-    image: apache/kafka:4.0.1
-    container_name: sn_kafka
+  # ── RabbitMQ ───────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: sn_rabbitmq
     ports:
-      - "9092:9092"
+      - "5672:5672"
+      - "15672:15672"
     environment:
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_NODE_ID: 1
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@127.0.0.1:9093
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://sn_kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      RABBITMQ_DEFAULT_USER: socialnetwork
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-7g0WfNsQziV5r5P}
     volumes:
-      - kafkadata:/var/lib/kafka/data
+      - rabbitmqdata:/var/lib/rabbitmq
     networks: [main-network]
     restart: unless-stopped
 
@@ -67,7 +58,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
       - JwtSettings__Secret=${JWT_SECRET:-c8ea2ac5-0ca5-436b-af45-2033c4985a8a}
-    depends_on: [postgres, redis, kafka]
+    depends_on: [postgres, redis, rabbitmq]
     networks: [main-network]
     restart: unless-stopped
 
@@ -111,7 +102,7 @@ services:
       - AuthService__URL=http://user_api:8080/api/security/login
       - AuthService__Login=system
       - AuthService__Password=placeholder
-    depends_on: [postgres, redis, kafka, livefeed, user_api]
+    depends_on: [postgres, redis, rabbitmq, livefeed, user_api]
     networks: [main-network]
     restart: unless-stopped
 
@@ -182,4 +173,4 @@ services:
 volumes:
   pgdata:
   redisdata:
-  kafkadata:
+  rabbitmqdata:

@@ -1,4 +1,4 @@
-using Libraries.NpgsqlService.Security;
+using Libraries.Web.Common.Security;
 
 namespace UserService.Tests;
 

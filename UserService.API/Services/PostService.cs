@@ -1,4 +1,4 @@
-﻿using Libraries.Kafka.DTOs;
+﻿using Libraries.Web.Common.DTOs;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using UserService.Database;
@@ -14,38 +14,35 @@ namespace UserService.API.Services
         public async Task<Guid> AddPostAsync(Guid user_id, string post)
         {
             var postId = Guid.NewGuid();
-            var friends = await friendService.GetFollowerIdsAsync(user_id);
-            var outboxEntries = friends.Select(f => new OutboxEntry(
-                f.ToString(),
+            var outboxEntry = new OutboxEntry(
+                user_id.ToString(),
                 JsonSerializer.Serialize(
                     new FeedUpdateMessage(ActionTypeEnum.Create, postId, user_id, post),
                     Consts.JsonSerializerOptions)
-            )).ToArray();
-            return await postRepo.AddPostAsync(user_id, post, postId, outboxEntries);
+            );
+            return await postRepo.AddPostAsync(user_id, post, postId, outboxEntry);
         }
 
         public async Task UpdatePostAsync(Guid post_id, string post, Guid user_id)
         {
-            var friends = await friendService.GetFollowerIdsAsync(user_id);
-            var outboxEntries = friends.Select(f => new OutboxEntry(
-                f.ToString(),
+            var outboxEntry = new OutboxEntry(
+                user_id.ToString(),
                 JsonSerializer.Serialize(
                     new FeedUpdateMessage(ActionTypeEnum.Update, post_id, user_id, post),
                     Consts.JsonSerializerOptions)
-            )).ToArray();
-            await postRepo.UpdatePostAsync(post_id, post, user_id, outboxEntries);
+            );
+            await postRepo.UpdatePostAsync(post_id, post, user_id, outboxEntry);
         }
 
         public async Task DeletePostAsync(Guid post_id, Guid user_id)
         {
-            var friends = await friendService.GetFollowerIdsAsync(user_id);
-            var outboxEntries = friends.Select(f => new OutboxEntry(
-                f.ToString(),
+            var outboxEntry = new OutboxEntry(
+                user_id.ToString(),
                 JsonSerializer.Serialize(
                     new FeedUpdateMessage(ActionTypeEnum.Delete, post_id, user_id, null),
                     Consts.JsonSerializerOptions)
-            )).ToArray();
-            await postRepo.DeletePostAsync(post_id, user_id, outboxEntries);
+            );
+            await postRepo.DeletePostAsync(post_id, user_id, outboxEntry);
         }
 
         public async Task<Post?> GetPostAsync(Guid post_id)

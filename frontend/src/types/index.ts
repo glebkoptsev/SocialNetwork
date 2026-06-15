@@ -6,6 +6,7 @@ export interface User {
   biography: string
   city: string
   login: string
+  who_can_message: number
 }
 
 export interface Post {

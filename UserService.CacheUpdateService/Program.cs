@@ -1,5 +1,5 @@
 using Libraries.Clients.Common;
-using Libraries.Kafka;
+using Libraries.RabbitMQ;
 using Libraries.Web.Common.Caching;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
@@ -16,7 +16,7 @@ namespace UserService.CacheUpdateService
                 .ConfigureServices((hostContext, services) =>
                 {
                     services.AddOptions();
-                    services.Configure<KafkaSettings>(hostContext.Configuration.GetSection("KafkaSettings"));
+                    services.Configure<RabbitMQSettings>(hostContext.Configuration.GetSection("RabbitMQSettings"));
                     services.Configure<UserAuthServiceOptions>(hostContext.Configuration.GetSection("AuthService"));
                     services.AddDbContextFactory<UserDbContext>(options =>
                     {
@@ -31,8 +31,8 @@ namespace UserService.CacheUpdateService
                         return ConnectionMultiplexer.Connect(connStr!);
                     });
                     services.AddSingleton<IDistributedLock, RedisLock>();
-                    services.AddSingleton<IKafkaProducer, KafkaProducer<string, string>>();
-                    services.AddSingleton<KafkaClientHandle>();
+                    services.AddSingleton<IRabbitMQPublisher, RabbitMQPublisher>();
+                    services.AddSingleton<RabbitMQInitializer>();
                     services.AddHttpClient<UserAuthService>();
                     services.AddSingleton<UserAuthService>();
                     services.AddStackExchangeRedisCache(options =>
@@ -55,6 +55,10 @@ namespace UserService.CacheUpdateService
                 var context = scope.ServiceProvider.GetRequiredService<UserDbContext>();
                 await context.Database.MigrateAsync();
             }
+
+            // Initialize RabbitMQ topology
+            var rabbitInit = host.Services.GetRequiredService<RabbitMQInitializer>();
+            await rabbitInit.InitializeAsync();
 
             await host.RunAsync();
         }

@@ -15,5 +15,6 @@ namespace UserService.Database.Entities
         public string Password { get; set; } = null!;
         public bool CanPublishMessages { get; set; }
         public string Login { get; set; } = null!;
+        public int Who_can_message { get; set; } = 0;
     }
 }

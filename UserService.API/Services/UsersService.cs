@@ -99,5 +99,19 @@ namespace UserService.API.Services
                 .Select(u => u.ToResponse())
                 .ToListAsync();
         }
+
+        public async Task UpdateProfileAsync(Guid userId, UpdateProfileRequest request)
+        {
+            var user = await context.Users.FirstOrDefaultAsync(u => u.User_id == userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found");
+
+            user.First_name = request.First_name;
+            user.Second_name = request.Second_name;
+            user.Birthdate = request.Birthdate;
+            user.Biography = request.Biography;
+            user.City = request.City;
+            user.Who_can_message = request.Who_can_message;
+            await context.SaveChangesAsync();
+        }
     }
 }

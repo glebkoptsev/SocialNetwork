@@ -1,4 +1,4 @@
-﻿using Libraries.Kafka.DTOs;
+﻿using Libraries.Web.Common.DTOs;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using UserService.Database;

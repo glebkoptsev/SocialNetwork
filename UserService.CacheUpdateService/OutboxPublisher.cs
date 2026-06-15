@@ -1,12 +1,10 @@
-using Confluent.Kafka;
-using Libraries.Kafka;
-using System.Text.Json;
+using Libraries.RabbitMQ;
 
 namespace UserService.CacheUpdateService
 {
     public class OutboxPublisher(
         IServiceScopeFactory scopeFactory,
-        IKafkaProducer kafkaProducer) : BackgroundService
+        IRabbitMQPublisher rabbitMQPublisher) : BackgroundService
     {
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
@@ -25,13 +23,7 @@ namespace UserService.CacheUpdateService
 
                     foreach (var record in records)
                     {
-                        var message = new Message<string, string>
-                        {
-                            Key = record.KafkaKey,
-                            Value = record.KafkaValue,
-                            Timestamp = Timestamp.Default
-                        };
-                        await kafkaProducer.ProduceAsync("feed-posts", message);
+                        await rabbitMQPublisher.PublishAsync("feed-posts", "feed-posts", record.KafkaValue);
                         await outboxStore.MarkProcessedAsync(record.Id, ct);
                     }
                 }
