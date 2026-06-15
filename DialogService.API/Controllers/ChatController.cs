@@ -41,6 +41,14 @@ namespace DialogService.API.Controllers
             return Ok(await chatService.CreateChatAsync(request, currentUserId));
         }
 
+        [HttpPost, Route("{chat_id}/read")]
+        public async Task<IActionResult> MarkChatAsRead(Guid chat_id)
+        {
+            var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
+            await chatService.MarkChatAsReadAsync(chat_id, currentUserId);
+            return Ok();
+        }
+
         [HttpPost, Route("personal/{user_id}")]
         public async Task<ActionResult<Guid>> CreateOrGetPersonalChatAsync(Guid user_id)
         {

@@ -3,6 +3,17 @@
 import { create } from 'zustand'
 import { api } from './api'
 
+function parseJwtUserId(token: string): string | null {
+  try {
+    const base64url = token.split('.')[1]
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(base64))
+    return payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] ?? payload['nameid'] ?? null
+  } catch {
+    return null
+  }
+}
+
 interface AuthState {
   token: string | null
   userId: string | null
@@ -31,18 +42,20 @@ export const useAuth = create<AuthState>((set) => ({
       .split('; ')
       .find((row) => row.startsWith('token='))
       ?.split('=')[1]
-    const userId = document.cookie
+    const login = document.cookie
       .split('; ')
       .find((row) => row.startsWith('userId='))
       ?.split('=')[1]
-    set({ token: token ?? null, userId: userId ?? null, loading: false })
+    const userId = token ? (parseJwtUserId(token) ?? login) : null
+    set({ token: token ?? null, userId, loading: false })
   },
 
   login: async (login, password) => {
     const { data } = await api.post('/api/security/login', { login, password })
+    const userId = parseJwtUserId(data.access_token)
     document.cookie = `token=${data.access_token}; path=/; max-age=${data.expiresIn}`
-    document.cookie = `userId=${login}; path=/; max-age=${data.expiresIn}`
-    set({ token: data.access_token, userId: login })
+    document.cookie = `userId=${userId}; path=/; max-age=${data.expiresIn}`
+    set({ token: data.access_token, userId })
   },
 
   register: async (body) => {

@@ -32,6 +32,7 @@ export interface Message {
   user_name: string
   message: string
   creation_datetime: string
+  status: number
 }
 
 export interface LoginResponse {

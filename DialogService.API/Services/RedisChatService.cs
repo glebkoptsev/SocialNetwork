@@ -80,10 +80,7 @@ namespace DialogService.API.Services
             var db = redis.GetDatabase(0);
             var existing = await db.StringGetAsync(personalKey);
 
-            if (!existing.IsNullOrEmpty && Guid.TryParse((string)existing!, out var existingChatId))
-                return existingChatId;
-
-            // Check privacy setting of target user
+            // Check privacy setting of target user even if chat exists in cache
             var targetUser = await userService.GetUserAsync(targetUserId);
             if (targetUser is null)
                 throw new KeyNotFoundException("Target user not found");
@@ -94,6 +91,9 @@ namespace DialogService.API.Services
                 if (!isSubscribed)
                     throw new UnauthorizedAccessException("User allows messages only from subscribers");
             }
+
+            if (!existing.IsNullOrEmpty && Guid.TryParse((string)existing!, out var existingChatId))
+                return existingChatId;
 
             var chatId = Guid.NewGuid();
             var chat = new RedisChat
@@ -140,6 +140,16 @@ namespace DialogService.API.Services
             if (chat_res.IsNullOrEmpty) return [];
             var chat = JsonSerializer.Deserialize<RedisChat>(chat_res.ToString(), jsonOptions);
             if (chat is null) return [];
+
+            var changed = false;
+            foreach (var m in chat.Messages.Where(m => m.User_id != user_id && m.Status < 1))
+            {
+                changed = true;
+                m.Status = 1;
+            }
+            if (changed)
+                await db.StringSetAsync($"chat-{chat_id}", JsonSerializer.Serialize(chat, jsonOptions));
+
             return chat.Messages.OrderBy(m => m.Created_at).Skip(offset).Take(limit)
                 .Select(m => new MessageDto 
                 { 
@@ -148,7 +158,8 @@ namespace DialogService.API.Services
                     Message = m.Text,
                     User_id = m.User_id,
                     User_name = m.User_name,
-                    Message_id = m.Message_id
+                    Message_id = m.Message_id,
+                    Status = m.Status
                 }).ToArray();
         }
 
@@ -179,11 +190,30 @@ namespace DialogService.API.Services
                 Message_id = Guid.NewGuid(),
                 Text = request.Message,
                 User_id = creator_id,
-                User_name = senderName
+                User_name = senderName,
+                Status = 0
             };
             chat.Messages.Add(msg);
             await db.StringSetAsync($"chat-{chat_id}", JsonSerializer.Serialize(chat, jsonOptions));
             return msg.Message_id;
+        }
+
+        public async Task MarkChatAsReadAsync(Guid chat_id, Guid user_id)
+        {
+            var db = redis.GetDatabase(0);
+            var chat_res = await db.StringGetAsync($"chat-{chat_id}");
+            if (chat_res.IsNullOrEmpty) return;
+            var chat = JsonSerializer.Deserialize<RedisChat>(chat_res.ToString(), jsonOptions);
+            if (chat is null) return;
+
+            var changed = false;
+            foreach (var m in chat.Messages.Where(m => m.User_id != user_id && m.Status < 2))
+            {
+                changed = true;
+                m.Status = 2;
+            }
+            if (changed)
+                await db.StringSetAsync($"chat-{chat_id}", JsonSerializer.Serialize(chat, jsonOptions));
         }
 
         public void Dispose() { redis.Dispose(); GC.SuppressFinalize(this); }

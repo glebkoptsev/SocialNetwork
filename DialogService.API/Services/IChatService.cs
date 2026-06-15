@@ -10,5 +10,6 @@ namespace DialogService.API.Services
         Task<Guid> SendMessageToChatAsync(Guid chat_id, SendMessageRequest request, Guid creator_id);
         Task<Guid> CreateChatAsync(CreateChatRequest request, Guid creator_id);
         Task<Guid> CreateOrGetPersonalChatAsync(Guid currentUserId, Guid targetUserId);
+        Task MarkChatAsReadAsync(Guid chat_id, Guid user_id);
     }
 }
