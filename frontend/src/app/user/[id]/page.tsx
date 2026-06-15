@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api } from '@/lib/api'
+import { api, dialogApi } from '@/lib/api'
 import { Post as PostType, User } from '@/types'
 import PostCard from '@/components/PostCard'
 import FriendButton from '@/components/FriendButton'
@@ -15,6 +15,7 @@ const PAGE_SIZE = 20
 export default function UserPage() {
   const { id } = useParams()
   const userId = useAuth((s) => s.userId)
+  const router = useRouter()
 
   const { data: user } = useQuery({
     queryKey: ['user', id],
@@ -95,6 +96,21 @@ export default function UserPage() {
         {user.biography && <p className="text-sm">{user.biography}</p>}
         <div className="flex gap-2 items-center">
           <FriendButton userId={userId!} friendId={id as string} />
+          {userId !== id && (
+            <button
+              onClick={async () => {
+                try {
+                  const { data: chatId } = await dialogApi.post(`/api/dialog/personal/${user.user_id}`)
+                  router.push(`/dialog/${chatId}`)
+                } catch (err: any) {
+                  alert(err?.response?.data?.error || 'Не удалось создать чат')
+                }
+              }}
+              className="bg-green-600 text-white rounded px-3 py-1 text-sm hover:bg-green-700"
+            >
+              Написать сообщение
+            </button>
+          )}
           {userId === id && (
             <Link href="/settings" className="text-sm text-blue-600 hover:underline">
               Редактировать

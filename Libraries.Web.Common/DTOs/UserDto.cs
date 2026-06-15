@@ -9,5 +9,6 @@ namespace Libraries.Web.Common.DTOs
         public string Biography { get; set; } = null!;
         public string City { get; set; } = null!;
         public bool? CanPublishMessages { get; set; }
+        public int Who_can_message { get; set; }
     }
 }

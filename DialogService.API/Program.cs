@@ -1,6 +1,7 @@
 using DialogService.API.Services;
 using DialogService.Database;
 using Libraries.Web.Common.Clients;
+using Libraries.Web.Common.Http;
 using Libraries.Web.Common.Middlewares;
 using Libraries.Web.Common.Settings;
 using Libraries.Web.Common.Swagger;
@@ -61,8 +62,17 @@ namespace DialogService.API
                 o.OperationFilter<SecurityRequirementFilter>(JwtBearerDefaults.AuthenticationScheme);
             });
 
-            builder.Services.AddHttpClient<UserServiceClient>();
-            builder.Services.AddTransient<UserServiceClient>();
+            builder.Services.AddHttpContextAccessor();
+            builder.Services.AddTransient<ForwardTokenHandler>();
+#if DEBUG
+            var userServiceUrl = "http://127.0.0.1:5000";
+#else
+            var userServiceUrl = "http://user_api:8080";
+#endif
+            builder.Services.AddHttpClient<UserServiceClient>(c =>
+            {
+                c.BaseAddress = new Uri(userServiceUrl);
+            }).AddHttpMessageHandler<ForwardTokenHandler>();
             builder.Services.AddSingleton<IChatService, RedisChatService>();
             builder.Services.AddDbContextPool<DialogDbContext>(options =>
             {

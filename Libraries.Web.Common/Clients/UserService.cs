@@ -1,24 +1,21 @@
 ﻿using Libraries.Web.Common.DTOs;
-using Microsoft.Extensions.Configuration;
 using System.Net.Http.Json;
 
-namespace Libraries.Web.Common.Clients
-{
-    public class UserServiceClient(IHttpClientFactory clientFactory, IConfiguration configuration)
-    {
-        private readonly IHttpClientFactory _httpClientFactory = clientFactory;
-#if DEBUG 
-        private readonly string _url = configuration["UserService:URL_Debug"]!;
-#else
-        private readonly string _url = configuration["UserService:URL"]!;
-#endif
+namespace Libraries.Web.Common.Clients;
 
-        public async Task<UserDto?> GetUserAsync(Guid id)
-        {
-            using var client = _httpClientFactory.CreateClient();
-            var response = await client.GetAsync($"{_url}/api/user/get/{id}");
-            if (!response.IsSuccessStatusCode) return null;
-            return await response.Content.ReadFromJsonAsync<UserDto>();
-        }
+public class UserServiceClient(HttpClient client)
+{
+    public async Task<UserDto?> GetUserAsync(Guid id)
+    {
+        var response = await client.GetAsync($"/api/user/get/{id}");
+        if (!response.IsSuccessStatusCode) return null;
+        return await response.Content.ReadFromJsonAsync<UserDto>();
+    }
+
+    public async Task<bool> GetSubscriptionStatusAsync(Guid friendId)
+    {
+        var response = await client.GetAsync($"/api/friend/status/{friendId}");
+        if (!response.IsSuccessStatusCode) return false;
+        return await response.Content.ReadFromJsonAsync<bool>();
     }
 }

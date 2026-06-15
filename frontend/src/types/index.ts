@@ -29,6 +29,7 @@ export interface Message {
   message_id: string
   chat_id: string
   user_id: string
+  user_name: string
   message: string
   creation_datetime: string
 }
