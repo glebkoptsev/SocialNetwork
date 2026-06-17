@@ -3,6 +3,7 @@ using System;
 using DialogService.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DialogService.Database.Migrations
 {
     [DbContext(typeof(DialogDbContext))]
-    partial class DialogDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260617173923_AddChatPersistence")]
+    partial class AddChatPersistence
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

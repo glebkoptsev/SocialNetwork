@@ -208,13 +208,27 @@ namespace UserService.CacheUpdateService
                         var retryCount = GetRetryCount(args);
                         if (retryCount < 3)
                         {
-                            await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: true, cancellationToken: ct);
+                            var props = new BasicProperties
+                            {
+                                Headers = new Dictionary<string, object?>
+                                {
+                                    ["x-retry-count"] = BitConverter.GetBytes(retryCount + 1)
+                                }
+                            };
+                            await channel.BasicPublishAsync(
+                                exchange: "feed-posts",
+                                routingKey: "feed-posts",
+                                mandatory: false,
+                                basicProperties: props,
+                                body: args.Body.ToArray(),
+                                cancellationToken: ct);
+                            Console.WriteLine($"Re-queued with retry {retryCount + 1}");
                         }
                         else
                         {
-                            Console.WriteLine($"Message dropped after {retryCount} retries: {Encoding.UTF8.GetString(args.Body.ToArray())}");
-                            await channel.BasicAckAsync(args.DeliveryTag, multiple: false, cancellationToken: ct);
+                            Console.WriteLine($"Message dropped after {retryCount} retries");
                         }
+                        await channel.BasicAckAsync(args.DeliveryTag, multiple: false, cancellationToken: ct);
                     }
                 };
 

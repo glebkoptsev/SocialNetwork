@@ -11,7 +11,7 @@ namespace UserService.API.Controllers
     public class FriendController(FriendService friendService, UsersService usersService) : ControllerBase
     {
         [HttpGet, Route("subscriptions"), Authorize]
-        public async Task<ActionResult<List<UserResponse>>> GetSubscriptions(string? user_id)
+        public async Task<ActionResult<List<UserResponse>>> GetSubscriptions(string? user_id, int offset = 0, int limit = 20)
         {
             Guid targetUserId;
             if (user_id is null)
@@ -21,11 +21,11 @@ namespace UserService.API.Controllers
                 targetUserId = await usersService.ResolveUserIdAsync(user_id);
                 if (targetUserId == Guid.Empty) return NotFound();
             }
-            return Ok(await usersService.GetSubscriptionsResponseAsync(targetUserId));
+            return Ok(await usersService.GetSubscriptionsResponseAsync(targetUserId, offset, limit));
         }
 
         [HttpGet, Route("followers"), Authorize]
-        public async Task<ActionResult<List<UserResponse>>> GetFollowers(string? user_id)
+        public async Task<ActionResult<List<UserResponse>>> GetFollowers(string? user_id, int offset = 0, int limit = 20)
         {
             Guid targetUserId;
             if (user_id is null)
@@ -35,7 +35,7 @@ namespace UserService.API.Controllers
                 targetUserId = await usersService.ResolveUserIdAsync(user_id);
                 if (targetUserId == Guid.Empty) return NotFound();
             }
-            return Ok(await usersService.GetFollowersResponseAsync(targetUserId));
+            return Ok(await usersService.GetFollowersResponseAsync(targetUserId, offset, limit));
         }
 
         [HttpGet, Route("status/{friend_id}"), Authorize]

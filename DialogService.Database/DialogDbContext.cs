@@ -27,14 +27,18 @@ namespace DialogService.Database
                 e.ToTable("chat_users");
                 e.HasKey(cu => new { cu.Chat_id, cu.User_id });
                 e.Property(cu => cu.Creation_datetime).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                e.HasIndex(cu => cu.User_id).HasDatabaseName("chat_users_userid_idx");
             });
 
             modelBuilder.Entity<MessageEntity>(e =>
             {
                 e.ToTable("messages");
-                e.HasKey(m => new { m.Message_id, m.Chat_id });
+                e.HasKey(m => m.Message_id);
                 e.Property(m => m.Message).HasMaxLength(2000);
+                e.Property(m => m.User_name).HasMaxLength(50);
                 e.Property(m => m.Creation_datetime).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                e.Property(m => m.Status).HasDefaultValue(0);
+                e.HasIndex(m => m.Chat_id).HasDatabaseName("messages_chatid_idx");
             });
         }
     }

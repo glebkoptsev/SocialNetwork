@@ -76,8 +76,8 @@ namespace DialogService.API
                 return ConnectionMultiplexer.Connect(connStr!);
             });
             builder.Services.AddSingleton<IDistributedLock, RedisLock>();
-            builder.Services.AddSingleton<RedisChatService>();
-            builder.Services.AddSingleton<IChatService>(sp => sp.GetRequiredService<RedisChatService>());
+            builder.Services.AddScoped<DatabaseChatService>();
+            builder.Services.AddScoped<IChatService>(sp => sp.GetRequiredService<DatabaseChatService>());
             builder.Services.AddDbContextPool<DialogDbContext>(options =>
             {
                 var connStr = builder.Configuration.GetConnectionString("postgres");

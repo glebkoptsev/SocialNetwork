@@ -74,10 +74,13 @@ namespace UserService.API.Services
             return users;
         }
 
-        public async Task<List<UserResponse>> GetSubscriptionsResponseAsync(Guid userId)
+        public async Task<List<UserResponse>> GetSubscriptionsResponseAsync(Guid userId, int offset = 0, int limit = 20)
         {
             var ids = await context.Friends
                 .Where(f => f.User_id == userId)
+                .OrderBy(f => f.Friend_id)
+                .Skip(offset)
+                .Take(limit)
                 .Select(f => f.Friend_id)
                 .ToListAsync();
 
@@ -87,10 +90,13 @@ namespace UserService.API.Services
                 .ToListAsync();
         }
 
-        public async Task<List<UserResponse>> GetFollowersResponseAsync(Guid userId)
+        public async Task<List<UserResponse>> GetFollowersResponseAsync(Guid userId, int offset = 0, int limit = 20)
         {
             var ids = await context.Friends
                 .Where(f => f.Friend_id == userId)
+                .OrderBy(f => f.User_id)
+                .Skip(offset)
+                .Take(limit)
                 .Select(f => f.User_id)
                 .ToListAsync();
 
