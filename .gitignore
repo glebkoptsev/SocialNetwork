@@ -1,4 +1,6 @@
 volumes/*
+frontend/test-results
+frontend/e2e/screenshots
 
 # User-specific configuration (secrets, connection strings)
 **/appsettings.Development.json
