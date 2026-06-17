@@ -79,8 +79,8 @@ export default function ChatPage() {
           {messages?.map((msg) => (
             <div
               key={msg.message_id}
-              className={`max-w-[75%] rounded-lg px-3 py-2 text-sm bg-gray-100 ${
-                msg.user_id === userId ? 'ml-auto rounded-br-sm' : 'rounded-bl-sm'
+              className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+                msg.user_id === userId ? 'bg-blue-50 ml-auto rounded-br-sm' : 'bg-gray-100 rounded-bl-sm'
               }`}
             >
               {msg.user_id !== userId && (
