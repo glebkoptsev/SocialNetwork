@@ -1,12 +1,16 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using UserService.Database;
 using UserService.Database.Entities;
 
 namespace UserService.CacheWarmup
 {
-    internal class CacheWarmuper(IDbContextFactory<UserDbContext> contextFactory, IDistributedCache distributedCache)
+    internal class CacheWarmuper(
+        IDbContextFactory<UserDbContext> contextFactory,
+        IDistributedCache distributedCache,
+        ILogger<CacheWarmuper> logger)
     {
         private readonly JsonSerializerOptions jsonSerializerOptions = new(JsonSerializerDefaults.Web);
 
@@ -38,7 +42,7 @@ namespace UserService.CacheWarmup
                     });
                 }
             }
-            Console.WriteLine("the end");
+            logger.LogInformation("Cache warmup completed for {Count} users", users_with_friends.Count);
         }
 
         private static async Task<List<Post>> GetFeedAsync(UserDbContext context, Guid user_id)

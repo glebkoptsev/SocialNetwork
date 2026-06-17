@@ -1,19 +1,22 @@
-using System.Text;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
+using System.Text;
 
 namespace Libraries.RabbitMQ;
 
 public class RabbitMQPublisher : IRabbitMQPublisher, IAsyncDisposable
 {
     private readonly RabbitMQSettings _settings;
+    private readonly ILogger<RabbitMQPublisher> _logger;
     private IConnection? _connection;
     private IChannel? _channel;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
-    public RabbitMQPublisher(IOptions<RabbitMQSettings> options)
+    public RabbitMQPublisher(IOptions<RabbitMQSettings> options, ILogger<RabbitMQPublisher> logger)
     {
         _settings = options.Value;
+        _logger = logger;
     }
 
     public async Task PublishAsync(string exchange, string routingKey, string message)
@@ -54,12 +57,12 @@ public class RabbitMQPublisher : IRabbitMQPublisher, IAsyncDisposable
                     var channel = await connection.CreateChannelAsync();
                     _connection = connection;
                     _channel = channel;
-                    Console.WriteLine("RabbitMQ publisher connected");
+                    _logger.LogInformation("RabbitMQ publisher connected");
                     return;
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Попытка {attempt}/10 подключения publisher к RabbitMQ: {e.Message}");
+                    _logger.LogWarning(e, "RabbitMQ publisher connect attempt {Attempt}/10", attempt);
                     await Task.Delay(TimeSpan.FromSeconds(3));
                 }
             }

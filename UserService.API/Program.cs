@@ -46,9 +46,20 @@ namespace UserService.API
                     ValidAudience = jwtSettings!.Audience,
                     IssuerSigningKey = jwtSettings.GetSigningCredentials().Key
                 };
+                o.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        if (!string.IsNullOrEmpty(accessToken))
+                            context.Token = accessToken;
+                        return Task.CompletedTask;
+                    }
+                };
             });
 
             builder.Services.AddAuthorization();
+            builder.Services.AddSignalR();
             builder.Services.AddRateLimiter(o =>
             {
                 o.AddFixedWindowLimiter("LoginPolicy", c =>
@@ -115,6 +126,7 @@ namespace UserService.API
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+            app.MapHub<FeedHub>("/post/feed/posted");
 
             // Apply migrations and seed system user
             using (var scope = app.Services.CreateScope())

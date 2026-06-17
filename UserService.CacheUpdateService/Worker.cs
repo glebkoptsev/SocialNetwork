@@ -15,18 +15,35 @@ using Libraries.Clients.Common;
 
 namespace UserService.CacheUpdateService
 {
-    public class Worker(
-        IOptions<RabbitMQSettings> options,
-        IDistributedCache cache,
-        IServiceScopeFactory scopeFactory,
-        IConfiguration configuration,
-        UserAuthService userAuthService,
-        IDistributedLock distributedLock) : BackgroundService
+    public class Worker : BackgroundService
     {
+        private readonly IOptions<RabbitMQSettings> options;
+        private readonly IDistributedCache cache;
+        private readonly IServiceScopeFactory scopeFactory;
+        private readonly UserAuthService userAuthService;
+        private readonly IDistributedLock distributedLock;
+        private readonly ILogger<Worker> logger;
         private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
         private static readonly DistributedCacheEntryOptions CacheTtl = new() { SlidingExpiration = TimeSpan.FromHours(24) };
+        private readonly string signalrHost;
 
-        private readonly string signalrHost = configuration["LiveFeedService:URL"]!;
+        public Worker(
+            IOptions<RabbitMQSettings> options,
+            IDistributedCache cache,
+            IServiceScopeFactory scopeFactory,
+            IConfiguration configuration,
+            UserAuthService userAuthService,
+            IDistributedLock distributedLock,
+            ILogger<Worker> logger)
+        {
+            this.options = options;
+            this.cache = cache;
+            this.scopeFactory = scopeFactory;
+            this.userAuthService = userAuthService;
+            this.distributedLock = distributedLock;
+            this.logger = logger;
+            signalrHost = configuration["SignalR:HubUrl"]!;
+        }
 
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
@@ -42,7 +59,7 @@ namespace UserService.CacheUpdateService
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Worker outer loop error: {e.Message}");
+                    logger.LogWarning(e, "Worker outer loop error, restarting in 5s");
                     await Task.Delay(TimeSpan.FromSeconds(5), ct);
                 }
             }
@@ -52,7 +69,6 @@ namespace UserService.CacheUpdateService
         {
             HubConnection? connection = null;
 
-            // Connect to SignalR
             while (!ct.IsCancellationRequested)
             {
                 try
@@ -69,19 +85,18 @@ namespace UserService.CacheUpdateService
                         .WithAutomaticReconnect()
                         .Build();
                     await connection.StartAsync(ct);
-                    Console.WriteLine("Connected to SignalR hub");
+                    logger.LogInformation("Connected to SignalR hub");
                     break;
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"SignalR connection failed: {e.Message}");
+                    logger.LogWarning(e, "SignalR connection failed, retry in 10s");
                     await Task.Delay(TimeSpan.FromSeconds(10), ct);
                 }
             }
 
             if (connection is null || ct.IsCancellationRequested) return;
 
-            // Connect to RabbitMQ
             var settings = options.Value;
             var factory = new ConnectionFactory
             {
@@ -92,7 +107,6 @@ namespace UserService.CacheUpdateService
                 RequestedConnectionTimeout = TimeSpan.FromSeconds(5),
             };
 
-            Console.WriteLine("Connecting RabbitMQ consumer...");
             IConnection rabbitConnection = null!;
             IChannel channel = null!;
             for (int attempt = 1; attempt <= 10; attempt++)
@@ -102,12 +116,12 @@ namespace UserService.CacheUpdateService
                     rabbitConnection = await factory.CreateConnectionAsync();
                     channel = await rabbitConnection.CreateChannelAsync();
                     await channel.BasicQosAsync(0, 1, false, ct);
-                    Console.WriteLine("RabbitMQ consumer connected with prefetch=1");
+                    logger.LogInformation("RabbitMQ consumer connected with prefetch=1");
                     break;
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Попытка {attempt}/10 подключения consumer к RabbitMQ: {e.Message}");
+                    logger.LogWarning(e, "RabbitMQ connection attempt {Attempt}/10", attempt);
                     if (attempt == 10) throw;
                     await Task.Delay(TimeSpan.FromSeconds(3), ct);
                 }
@@ -124,12 +138,11 @@ namespace UserService.CacheUpdateService
                     {
                         var body = args.Body.ToArray();
                         var messageText = Encoding.UTF8.GetString(body);
-                        Console.WriteLine($"Обработка сообщения {messageText}");
 
                         var message = JsonSerializer.Deserialize<FeedUpdateMessage>(messageText, jsonOptions)!;
                         if (message.ActionType == ActionTypeEnum.FullReload)
                         {
-                            Console.WriteLine($"Инициирована перезагрузка кеша");
+                            logger.LogInformation("FullReload for user {UserId}", message.Author_id);
                             await ReloadFeedAsync(message.Author_id, $"feed-{message.Author_id}", ct);
                             await channel.BasicAckAsync(args.DeliveryTag, multiple: false, cancellationToken: ct);
                             return;
@@ -158,7 +171,6 @@ namespace UserService.CacheUpdateService
                                     cached.RemoveAll(p => p.Post_id == message.Post_id);
                                     return cached.Count > 0 ? cached : null;
                                 }, ct);
-
                                 await NotifyFollowerAsync(connection, followerId, messageText, ct);
                             }
                         }
@@ -195,7 +207,6 @@ namespace UserService.CacheUpdateService
 
                                     return null;
                                 }, ct);
-
                                 await NotifyFollowerAsync(connection, followerId, messageText, ct);
                             }
                         }
@@ -204,7 +215,7 @@ namespace UserService.CacheUpdateService
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine(e.ToString());
+                        logger.LogError(e, "Message processing failed");
                         var retryCount = GetRetryCount(args);
                         if (retryCount < 3)
                         {
@@ -222,27 +233,19 @@ namespace UserService.CacheUpdateService
                                 basicProperties: props,
                                 body: args.Body.ToArray(),
                                 cancellationToken: ct);
-                            Console.WriteLine($"Re-queued with retry {retryCount + 1}");
+                            logger.LogWarning("Re-queued message with retry {Retry}", retryCount + 1);
                         }
                         else
                         {
-                            Console.WriteLine($"Message dropped after {retryCount} retries");
+                            logger.LogWarning("Message dropped after {Retry} retries", retryCount);
                         }
                         await channel.BasicAckAsync(args.DeliveryTag, multiple: false, cancellationToken: ct);
                     }
                 };
 
                 await channel.BasicConsumeAsync(queue: "feed-posts", autoAck: false, consumer: consumer, cancellationToken: ct);
-
-                // Wait for cancellation or connection loss
-                try
-                {
-                    await Task.Delay(Timeout.Infinite, ct);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Normal shutdown
-                }
+                try { await Task.Delay(Timeout.Infinite, ct); }
+                catch (OperationCanceledException) { }
             }
         }
 
@@ -250,9 +253,7 @@ namespace UserService.CacheUpdateService
         {
             if (args.BasicProperties?.Headers?.TryGetValue("x-retry-count", out var retryObj) == true
                 && retryObj is byte[] bytes)
-            {
                 return BitConverter.ToInt32(bytes, 0);
-            }
             return 0;
         }
 
@@ -261,9 +262,7 @@ namespace UserService.CacheUpdateService
             try
             {
                 if (connection.State == HubConnectionState.Connected)
-                {
                     await connection.InvokeAsync("Send", message, followerId.ToString(), ct);
-                }
             }
             catch (Exception e)
             {
@@ -276,7 +275,7 @@ namespace UserService.CacheUpdateService
             await using var lockHandle = await distributedLock.AcquireAsync($"lock:{key}", TimeSpan.FromSeconds(30));
             if (lockHandle is null)
             {
-                Console.WriteLine($"Failed to acquire lock for {key}, skipping reload");
+                logger.LogWarning("Failed to acquire lock for {Key}, skipping reload", key);
                 return;
             }
 

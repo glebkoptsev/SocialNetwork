@@ -55,9 +55,16 @@ export default function FeedPage() {
     conn.on('Receive', () => {
       loadPosts(0, false)
     })
-    conn.start()
+    conn.start().catch(() => {})
     return () => { conn.stop() }
   }, [token, loadPosts])
+
+  // PostComposer event fallback
+  useEffect(() => {
+    const handler = () => loadPosts(0, false)
+    window.addEventListener('post-created', handler)
+    return () => window.removeEventListener('post-created', handler)
+  }, [loadPosts])
 
   // Infinite scroll
   useEffect(() => {

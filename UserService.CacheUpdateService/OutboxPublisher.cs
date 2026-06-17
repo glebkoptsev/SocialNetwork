@@ -5,7 +5,8 @@ namespace UserService.CacheUpdateService
 {
     public class OutboxPublisher(
         IServiceScopeFactory scopeFactory,
-        IRabbitMQPublisher rabbitMQPublisher) : BackgroundService
+        IRabbitMQPublisher rabbitMQPublisher,
+        ILogger<OutboxPublisher> logger) : BackgroundService
     {
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
@@ -28,12 +29,11 @@ namespace UserService.CacheUpdateService
                         await outboxStore.MarkProcessedAsync(record.Id, ct);
                     }
 
-                    // Purge old processed records periodically
                     await outboxStore.PurgeProcessedAsync(ct);
                 }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {
-                    Console.WriteLine(e.ToString());
+                    logger.LogError(e, "OutboxPublisher error");
                     await Task.Delay(5000, ct);
                 }
             }

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 
@@ -6,10 +7,12 @@ namespace Libraries.RabbitMQ;
 public class RabbitMQInitializer
 {
     private readonly RabbitMQSettings _settings;
+    private readonly ILogger<RabbitMQInitializer> _logger;
 
-    public RabbitMQInitializer(IOptions<RabbitMQSettings> options)
+    public RabbitMQInitializer(IOptions<RabbitMQSettings> options, ILogger<RabbitMQInitializer> logger)
     {
         _settings = options.Value;
+        _logger = logger;
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)
@@ -29,7 +32,6 @@ public class RabbitMQInitializer
                 await using var connection = await factory.CreateConnectionAsync(cancellationToken: ct);
                 await using var channel = await connection.CreateChannelAsync(cancellationToken: ct);
 
-                // Main exchange
                 await channel.ExchangeDeclareAsync(
                     exchange: "feed-posts",
                     type: ExchangeType.Direct,
@@ -37,7 +39,6 @@ public class RabbitMQInitializer
                     autoDelete: false,
                     cancellationToken: ct);
 
-                // Dead-letter exchange
                 await channel.ExchangeDeclareAsync(
                     exchange: "feed-posts-dlx",
                     type: ExchangeType.Direct,
@@ -45,7 +46,6 @@ public class RabbitMQInitializer
                     autoDelete: false,
                     cancellationToken: ct);
 
-                // Main queue with DLX
                 try
                 {
                     await channel.QueueDeclareAsync(
@@ -62,7 +62,6 @@ public class RabbitMQInitializer
                 }
                 catch (Exception)
                 {
-                    // Queue exists with different args — delete and recreate
                     await channel.QueueDeleteAsync("feed-posts", cancellationToken: ct);
                     await channel.QueueDeclareAsync(
                         queue: "feed-posts",
@@ -83,7 +82,6 @@ public class RabbitMQInitializer
                     routingKey: "feed-posts",
                     cancellationToken: ct);
 
-                // Dead-letter queue
                 await channel.QueueDeclareAsync(
                     queue: "feed-posts-dlx",
                     durable: true,
@@ -97,16 +95,16 @@ public class RabbitMQInitializer
                     routingKey: "feed-posts-dlx",
                     cancellationToken: ct);
 
-                Console.WriteLine("RabbitMQ topology initialized with DLX");
+                _logger.LogInformation("RabbitMQ topology initialized with DLX");
                 return;
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Попытка {attempt}/10 создать топологию RabbitMQ: {e.Message}");
+                _logger.LogWarning(e, "RabbitMQ init attempt {Attempt}/10", attempt);
                 await Task.Delay(TimeSpan.FromSeconds(3), ct);
             }
         }
-        Console.WriteLine("Не удалось инициализировать RabbitMQ после 10 попыток");
+        _logger.LogError("RabbitMQ init failed after 10 attempts");
         throw new InvalidOperationException("RabbitMQ init failed after 10 retries");
     }
 }

@@ -108,23 +108,6 @@ services:
     networks: [main-network]
     restart: unless-stopped
 
-  livefeed:
-    container_name: sn_livefeed
-    build:
-      context: .
-      dockerfile: UserService.LiveFeedService/Dockerfile
-    ports:
-      - "5003:8080"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - JwtSettings__Secret=${JWT_SECRET}
-      - CORS__AllowedOrigins=http://localhost:3000
-    depends_on:
-      user_api:
-        condition: service_started
-    networks: [main-network]
-    restart: unless-stopped
-
   cache_update:
     container_name: sn_cache_update
     build:
@@ -144,24 +127,6 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      user_api:
-        condition: service_started
-    networks: [main-network]
-    restart: unless-stopped
-
-  feed_client:
-    container_name: sn_feed_client
-    build:
-      context: .
-      dockerfile: UserService.FeedClient/Dockerfile
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - AuthService__URL=http://user_api:8080/api/security/login
-      - AuthService__Login=system
-      - AuthService__Password=placeholder
-    depends_on:
-      livefeed:
-        condition: service_started
       user_api:
         condition: service_started
     networks: [main-network]
@@ -220,13 +185,11 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:5000
       - NEXT_PUBLIC_DIALOG_API_URL=http://localhost:5002
-      - NEXT_PUBLIC_SIGNALR_URL=http://localhost:5003
+      - NEXT_PUBLIC_SIGNALR_URL=http://localhost:5000
     depends_on:
       user_api:
         condition: service_started
       dialog_api:
-        condition: service_started
-      livefeed:
         condition: service_started
     networks: [main-network]
     restart: unless-stopped

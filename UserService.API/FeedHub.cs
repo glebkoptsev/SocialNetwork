@@ -1,18 +1,17 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
-namespace UserService.LiveFeedService.Controllers
+namespace UserService.API
 {
     [Authorize]
     public class FeedHub : Hub
     {
+        private static readonly string SystemUserId = "00000000-0000-0000-0000-000000000000";
+
         public async Task Send(string message, string userId)
         {
-            var callerId = Context.UserIdentifier;
-            if (callerId == userId)
-            {
+            if (Context.UserIdentifier == SystemUserId)
                 await Clients.User(userId).SendAsync("Receive", message);
-            }
         }
     }
 }

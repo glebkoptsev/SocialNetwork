@@ -16,6 +16,7 @@ export default function PostComposer() {
     try {
       await api.post('/api/post/create', { text })
       setText('')
+      window.dispatchEvent(new CustomEvent('post-created'))
     } catch {
       setError('Не удалось опубликовать пост')
     }
