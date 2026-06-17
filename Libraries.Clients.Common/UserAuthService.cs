@@ -9,18 +9,13 @@ namespace Libraries.Clients.Common
         private readonly IOptions<UserAuthServiceOptions> options = options;
 
         private UserAuthServiceToken? Token { get; set; }
-        //private SemaphoreSlim SemaphoreSlim { get; set; } = new SemaphoreSlim(1, 1);
 
         public async Task<string?> GetTokenAsync()
         {
             if (Token is null || Token.IsExpired)
             {
                 using var client = httpClientFactory.CreateClient();
-#if DEBUG
-                string url = options.Value.URL_Debug;
-#else
                 string url = options.Value.URL;
-#endif
                 var response = await client.PostAsJsonAsync(url, new 
                 { 
                     login = options.Value.Login, 

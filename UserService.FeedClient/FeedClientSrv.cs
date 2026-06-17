@@ -8,11 +8,7 @@ namespace UserService.FeedClient
     public class FeedClientSrv(UserAuthService userAuthService, IConfiguration configuration) : BackgroundService
     {
         private readonly UserAuthService userAuthService = userAuthService;
-#if DEBUG
-        private readonly string signalrHost = configuration["LiveFeedService:URL_Debug"]!;
-#else
         private readonly string signalrHost = configuration["LiveFeedService:URL"]!;
-#endif
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

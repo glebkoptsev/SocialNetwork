@@ -29,6 +29,7 @@ public class RabbitMQInitializer
                 await using var connection = await factory.CreateConnectionAsync(cancellationToken: ct);
                 await using var channel = await connection.CreateChannelAsync(cancellationToken: ct);
 
+                // Main exchange
                 await channel.ExchangeDeclareAsync(
                     exchange: "feed-posts",
                     type: ExchangeType.Direct,
@@ -36,12 +37,45 @@ public class RabbitMQInitializer
                     autoDelete: false,
                     cancellationToken: ct);
 
-                await channel.QueueDeclareAsync(
-                    queue: "feed-posts",
+                // Dead-letter exchange
+                await channel.ExchangeDeclareAsync(
+                    exchange: "feed-posts-dlx",
+                    type: ExchangeType.Direct,
                     durable: true,
-                    exclusive: false,
                     autoDelete: false,
                     cancellationToken: ct);
+
+                // Main queue with DLX
+                try
+                {
+                    await channel.QueueDeclareAsync(
+                        queue: "feed-posts",
+                        durable: true,
+                        exclusive: false,
+                        autoDelete: false,
+                        arguments: new Dictionary<string, object?>
+                        {
+                            ["x-dead-letter-exchange"] = "feed-posts-dlx",
+                            ["x-dead-letter-routing-key"] = "feed-posts-dlx",
+                        },
+                        cancellationToken: ct);
+                }
+                catch (Exception)
+                {
+                    // Queue exists with different args — delete and recreate
+                    await channel.QueueDeleteAsync("feed-posts", cancellationToken: ct);
+                    await channel.QueueDeclareAsync(
+                        queue: "feed-posts",
+                        durable: true,
+                        exclusive: false,
+                        autoDelete: false,
+                        arguments: new Dictionary<string, object?>
+                        {
+                            ["x-dead-letter-exchange"] = "feed-posts-dlx",
+                            ["x-dead-letter-routing-key"] = "feed-posts-dlx",
+                        },
+                        cancellationToken: ct);
+                }
 
                 await channel.QueueBindAsync(
                     queue: "feed-posts",
@@ -49,7 +83,21 @@ public class RabbitMQInitializer
                     routingKey: "feed-posts",
                     cancellationToken: ct);
 
-                Console.WriteLine("RabbitMQ topology initialized");
+                // Dead-letter queue
+                await channel.QueueDeclareAsync(
+                    queue: "feed-posts-dlx",
+                    durable: true,
+                    exclusive: false,
+                    autoDelete: false,
+                    cancellationToken: ct);
+
+                await channel.QueueBindAsync(
+                    queue: "feed-posts-dlx",
+                    exchange: "feed-posts-dlx",
+                    routingKey: "feed-posts-dlx",
+                    cancellationToken: ct);
+
+                Console.WriteLine("RabbitMQ topology initialized with DLX");
                 return;
             }
             catch (Exception e)

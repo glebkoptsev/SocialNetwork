@@ -11,7 +11,7 @@ export default function PostCard({ post, showAuthor }: { post: Post; showAuthor?
     <div className="bg-white rounded-lg border p-4 space-y-2">
       {showAuthor && (
         <Link href={`/user/${post.user_id}`} className="text-sm text-blue-600 hover:underline">
-          {authorName ?? `${post.user_id.slice(0, 8)}...`}
+          {authorName ?? 'Неизвестный автор'}
         </Link>
       )}
       <p className="whitespace-pre-wrap">{post.text}</p>

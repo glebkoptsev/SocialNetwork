@@ -54,6 +54,9 @@ namespace UserService.Database
                 e.Property(p => p.Text).HasColumnName("post").HasMaxLength(2000);
                 e.Property(p => p.Creation_datetime).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 e.HasIndex(p => p.User_id).HasDatabaseName("posts_userid_idx");
+                e.HasIndex(p => new { p.User_id, p.Creation_datetime })
+                    .HasDatabaseName("posts_userid_created_idx")
+                    .HasMethod("btree");
                 e.Ignore(p => p.AuthorFirstName);
                 e.Ignore(p => p.AuthorSecondName);
             });
@@ -64,6 +67,7 @@ namespace UserService.Database
                 e.HasKey(o => o.Id);
                 e.Property(o => o.Id).ValueGeneratedOnAdd();
                 e.Property(o => o.Created_at).HasDefaultValueSql("NOW()");
+                e.HasIndex(o => o.Processed_at).HasDatabaseName("feed_outbox_processed_idx");
             });
         }
     }

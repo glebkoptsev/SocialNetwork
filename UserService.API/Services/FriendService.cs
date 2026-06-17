@@ -10,7 +10,11 @@ namespace UserService.API.Services
     {
         public async Task AddFriendAsync(Guid user_id, Guid friend_id)
         {
-            context.Friends.Add(new FriendEntity { User_id = user_id, Friend_id = friend_id });
+            var exists = await context.Friends.AnyAsync(f => f.User_id == user_id && f.Friend_id == friend_id);
+            if (!exists)
+            {
+                context.Friends.Add(new FriendEntity { User_id = user_id, Friend_id = friend_id });
+            }
 
             var outboxValue = JsonSerializer.Serialize(
                 new FeedUpdateMessage(ActionTypeEnum.FullReload, null, user_id, null),

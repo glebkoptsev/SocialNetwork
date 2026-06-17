@@ -41,8 +41,13 @@ namespace Libraries.Web.Common.Middlewares
                     Type = context.Request.Method,
                     IPAddress = context.Connection.RemoteIpAddress?.ToString() ?? string.Empty,
                     ExecutionTimeMs = sw.Elapsed.TotalMilliseconds,
-                    RequestHeaders = string.Join("; ", context.Request.Headers),
-                    ResponseHeaders = string.Join("; ", context.Response.Headers),
+                    RequestHeaders = string.Join("; ", context.Request.Headers
+                        .Where(h => !string.Equals(h.Key, "Authorization", StringComparison.OrdinalIgnoreCase)
+                                  && !string.Equals(h.Key, "Cookie", StringComparison.OrdinalIgnoreCase))
+                        .Select(h => $"{h.Key}: {h.Value}")),
+                    ResponseHeaders = string.Join("; ", context.Response.Headers
+                        .Where(h => !string.Equals(h.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase))
+                        .Select(h => $"{h.Key}: {h.Value}")),
                     ResponseStatus = context.Response.StatusCode
                 };
                 //context.Response.Headers.Append("x-request-id", requestLog.Id);

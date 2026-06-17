@@ -1,5 +1,6 @@
 using DialogService.API.Services;
 using DialogService.Database;
+using Libraries.Web.Common.Caching;
 using Libraries.Web.Common.Clients;
 using Libraries.Web.Common.Http;
 using Libraries.Web.Common.Middlewares;
@@ -10,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
 
 namespace DialogService.API
 {
@@ -27,9 +29,8 @@ namespace DialogService.API
             })
             .AddJwtBearer(o =>
             {
-#if DEBUG
-                o.RequireHttpsMetadata = false;
-#endif
+                if (builder.Environment.IsDevelopment())
+                    o.RequireHttpsMetadata = false;
                 o.SaveToken = true;
                 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
                 o.TokenValidationParameters = new TokenValidationParameters
@@ -64,31 +65,39 @@ namespace DialogService.API
 
             builder.Services.AddHttpContextAccessor();
             builder.Services.AddTransient<ForwardTokenHandler>();
-#if DEBUG
-            var userServiceUrl = "http://127.0.0.1:5000";
-#else
-            var userServiceUrl = "http://user_api:8080";
-#endif
+            var userServiceUrl = builder.Configuration.GetValue<string>("UserService:URL") ?? "http://user_api:8080";
             builder.Services.AddHttpClient<UserServiceClient>(c =>
             {
                 c.BaseAddress = new Uri(userServiceUrl);
             }).AddHttpMessageHandler<ForwardTokenHandler>();
-            builder.Services.AddSingleton<IChatService, RedisChatService>();
+            builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+            {
+                var connStr = builder.Configuration.GetConnectionString("redis");
+                return ConnectionMultiplexer.Connect(connStr!);
+            });
+            builder.Services.AddSingleton<IDistributedLock, RedisLock>();
+            builder.Services.AddSingleton<RedisChatService>();
+            builder.Services.AddSingleton<IChatService>(sp => sp.GetRequiredService<RedisChatService>());
             builder.Services.AddDbContextPool<DialogDbContext>(options =>
             {
                 var connStr = builder.Configuration.GetConnectionString("postgres");
                 options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
             });
+            var corsOrigins = builder.Configuration["CORS:AllowedOrigins"]?.Split(",", StringSplitOptions.RemoveEmptyEntries) ?? ["http://localhost:3000"];
             builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
-                p.WithOrigins("http://localhost:3000")
+                p.WithOrigins(corsOrigins)
                     .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                     .WithHeaders("authorization", "content-type", "x-requested-with")
                     .AllowCredentials()));
             var app = builder.Build();
             app.UseCors("Frontend");
+            app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
             app.UseMiddleware<RequestLoggingMiddleware>();
-            app.UseSwagger();
-            app.UseSwaggerUI();
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+            }
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();

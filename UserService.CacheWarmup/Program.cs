@@ -29,11 +29,7 @@ namespace UserService.CacheWarmup
                     services.AddScoped<CacheWarmuper>();
                     services.AddStackExchangeRedisCache(options =>
                     {
-#if DEBUG
-                        options.Configuration = hostContext.Configuration.GetConnectionString("redis_debug");
-#else
                         options.Configuration = hostContext.Configuration.GetConnectionString("redis");
-#endif
                     });
                 }).Build();
         }

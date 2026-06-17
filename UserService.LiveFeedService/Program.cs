@@ -20,7 +20,8 @@ namespace UserService.LiveFeedService
             })
             .AddJwtBearer(o =>
             {
-                o.RequireHttpsMetadata = false;
+                if (builder.Environment.IsDevelopment())
+                    o.RequireHttpsMetadata = false;
                 o.SaveToken = true;
                 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
                 o.TokenValidationParameters = new TokenValidationParameters
@@ -48,8 +49,9 @@ namespace UserService.LiveFeedService
             });
 
             builder.Services.AddAuthorization();
+            var corsOrigins = builder.Configuration["CORS:AllowedOrigins"]?.Split(",", StringSplitOptions.RemoveEmptyEntries) ?? ["http://localhost:3000"];
             builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
-                p.WithOrigins("http://localhost:3000")
+                p.WithOrigins(corsOrigins)
                     .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                     .WithHeaders("authorization", "content-type", "x-requested-with")
                     .AllowCredentials()));

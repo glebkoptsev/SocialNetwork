@@ -20,9 +20,12 @@ public class RabbitMQPublisher : IRabbitMQPublisher, IAsyncDisposable
     {
         await EnsureConnectionAsync();
         var body = Encoding.UTF8.GetBytes(message);
+        var props = new BasicProperties { DeliveryMode = DeliveryModes.Persistent };
         await _channel!.BasicPublishAsync(
             exchange: exchange,
             routingKey: routingKey,
+            mandatory: false,
+            basicProperties: props,
             body: body);
     }
 

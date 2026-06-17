@@ -22,7 +22,7 @@ namespace UserService.API.Services
 
         public async Task<User?> GetUserByLoginAsync(string login)
         {
-            return await context.Users.FirstOrDefaultAsync(u => u.Login.ToLower() == login.ToLower());
+            return await context.Users.FirstOrDefaultAsync(u => EF.Functions.ILike(u.Login, login));
         }
 
         public async Task<UserRegisterResponse> RegisterUserAsync(UserRegisterRequest request)

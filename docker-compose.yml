@@ -12,7 +12,7 @@ services:
     command: -c max_connections=500
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: socialnetwork
     ports:
       - "5432:5432"
@@ -20,16 +20,27 @@ services:
       - pgdata:/var/lib/postgresql/data
     networks: [main-network]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   redis:
     container_name: sn_redis
     image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
     networks: [main-network]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # ── RabbitMQ ───────────────────────────────────────────────
   rabbitmq:
@@ -40,11 +51,16 @@ services:
       - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: socialnetwork
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-7g0WfNsQziV5r5P}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq
     networks: [main-network]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ── .NET Services ──────────────────────────────────────────
   user_api:
@@ -56,9 +72,17 @@ services:
       - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
-      - JwtSettings__Secret=${JWT_SECRET:-c8ea2ac5-0ca5-436b-af45-2033c4985a8a}
-    depends_on: [postgres, redis, rabbitmq]
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD};database=socialnetwork
+      - JwtSettings__Secret=${JWT_SECRET}
+      - RabbitMQSettings__Password=${RABBITMQ_PASSWORD}
+      - CORS__AllowedOrigins=http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks: [main-network]
     restart: unless-stopped
 
@@ -71,9 +95,16 @@ services:
       - "5002:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
-      - JwtSettings__Secret=${JWT_SECRET:-c8ea2ac5-0ca5-436b-af45-2033c4985a8a}
-    depends_on: [postgres, redis, user_api]
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD};database=socialnetwork
+      - JwtSettings__Secret=${JWT_SECRET}
+      - CORS__AllowedOrigins=http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user_api:
+        condition: service_started
     networks: [main-network]
     restart: unless-stopped
 
@@ -86,8 +117,11 @@ services:
       - "5003:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - JwtSettings__Secret=${JWT_SECRET:-c8ea2ac5-0ca5-436b-af45-2033c4985a8a}
-    depends_on: [user_api]
+      - JwtSettings__Secret=${JWT_SECRET}
+      - CORS__AllowedOrigins=http://localhost:3000
+    depends_on:
+      user_api:
+        condition: service_started
     networks: [main-network]
     restart: unless-stopped
 
@@ -97,12 +131,21 @@ services:
       context: .
       dockerfile: UserService.CacheUpdateService/Dockerfile
     environment:
-      - DOTNET_ENVIRONMENT=Production
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD};database=socialnetwork
       - AuthService__URL=http://user_api:8080/api/security/login
       - AuthService__Login=system
       - AuthService__Password=placeholder
-    depends_on: [postgres, redis, rabbitmq, livefeed, user_api]
+      - RabbitMQSettings__Password=${RABBITMQ_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      user_api:
+        condition: service_started
     networks: [main-network]
     restart: unless-stopped
 
@@ -112,11 +155,15 @@ services:
       context: .
       dockerfile: UserService.FeedClient/Dockerfile
     environment:
-      - DOTNET_ENVIRONMENT=Production
+      - ASPNETCORE_ENVIRONMENT=Production
       - AuthService__URL=http://user_api:8080/api/security/login
       - AuthService__Login=system
       - AuthService__Password=placeholder
-    depends_on: [livefeed, user_api]
+    depends_on:
+      livefeed:
+        condition: service_started
+      user_api:
+        condition: service_started
     networks: [main-network]
     restart: unless-stopped
 
@@ -127,8 +174,10 @@ services:
       context: .
       dockerfile: UserService.UsersGenerator/Dockerfile
     environment:
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
-    depends_on: [postgres]
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD};database=socialnetwork
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks: [main-network]
     profiles: [seed]
 
@@ -138,8 +187,10 @@ services:
       context: .
       dockerfile: UserService.PostsGenerator/Dockerfile
     environment:
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
-    depends_on: [postgres]
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD};database=socialnetwork
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks: [main-network]
     profiles: [seed]
 
@@ -149,8 +200,12 @@ services:
       context: .
       dockerfile: UserService.CacheWarmup/Dockerfile
     environment:
-      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD:-7g0WfNsQziV5r5P};database=socialnetwork
-    depends_on: [postgres, redis]
+      - ConnectionStrings__postgres=Host=postgres:5432;User id=postgres;Password=${POSTGRES_PASSWORD};database=socialnetwork
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks: [main-network]
     profiles: [seed]
 
@@ -166,7 +221,13 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:5000
       - NEXT_PUBLIC_DIALOG_API_URL=http://localhost:5002
       - NEXT_PUBLIC_SIGNALR_URL=http://localhost:5003
-    depends_on: [user_api, dialog_api, livefeed]
+    depends_on:
+      user_api:
+        condition: service_started
+      dialog_api:
+        condition: service_started
+      livefeed:
+        condition: service_started
     networks: [main-network]
     restart: unless-stopped
 

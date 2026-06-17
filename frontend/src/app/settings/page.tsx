@@ -1,15 +1,14 @@
 'use client'
 
 import { useState, useEffect, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { User } from '@/types'
 import { useAuth } from '@/lib/auth'
 
 export default function SettingsPage() {
   const userId = useAuth((s) => s.userId)
-  const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
@@ -23,16 +22,19 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!userId) return
-    api.get<User>(`/api/user/get/${userId}`).then((r) => {
-      setForm({
-        first_name: r.data.first_name,
-        second_name: r.data.second_name,
-        birthdate: r.data.birthdate,
-        biography: r.data.biography,
-        city: r.data.city,
-        who_can_message: r.data.who_can_message ?? 0,
+    api.get<User>(`/api/user/get/${userId}`)
+      .then((r) => {
+        setForm({
+          first_name: r.data.first_name,
+          second_name: r.data.second_name,
+          birthdate: r.data.birthdate,
+          biography: r.data.biography,
+          city: r.data.city,
+          who_can_message: r.data.who_can_message ?? 0,
+        })
       })
-    })
+      .catch(() => setError('Не удалось загрузить профиль'))
+      .finally(() => setLoading(false))
   }, [userId])
 
   const handleSubmit = async (e: FormEvent) => {
@@ -49,8 +51,12 @@ export default function SettingsPage() {
     setSaving(false)
   }
 
-  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setForm((prev) => ({ ...prev, [key]: e.target.value }))
+  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const value = key === 'who_can_message' ? Number(e.target.value) : e.target.value
+    setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  if (loading) return <p className="text-gray-400 text-center">Загрузка...</p>
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
@@ -62,20 +68,37 @@ export default function SettingsPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-white rounded-lg border p-4 space-y-3">
           <h2 className="font-semibold">Основная информация</h2>
-          <input className="w-full border rounded px-3 py-2" placeholder="Имя" value={form.first_name} onChange={set('first_name')} required />
-          <input className="w-full border rounded px-3 py-2" placeholder="Фамилия" value={form.second_name} onChange={set('second_name')} required />
-          <input className="w-full border rounded px-3 py-2" type="date" value={form.birthdate} onChange={set('birthdate')} required />
-          <textarea className="w-full border rounded px-3 py-2" placeholder="О себе" value={form.biography} onChange={set('biography')} />
-          <input className="w-full border rounded px-3 py-2" placeholder="Город" value={form.city} onChange={set('city')} />
+          <label className="block">
+            <span className="text-xs text-gray-500">Имя</span>
+            <input className="w-full border rounded px-3 py-2 mt-1" value={form.first_name} onChange={set('first_name')} required />
+          </label>
+          <label className="block">
+            <span className="text-xs text-gray-500">Фамилия</span>
+            <input className="w-full border rounded px-3 py-2 mt-1" value={form.second_name} onChange={set('second_name')} required />
+          </label>
+          <label className="block">
+            <span className="text-xs text-gray-500">Дата рождения</span>
+            <input className="w-full border rounded px-3 py-2 mt-1" type="date" max={new Date().toISOString().split('T')[0]} value={form.birthdate} onChange={set('birthdate')} required />
+          </label>
+          <label className="block">
+            <span className="text-xs text-gray-500">О себе</span>
+            <textarea className="w-full border rounded px-3 py-2 mt-1" value={form.biography} onChange={set('biography')} />
+          </label>
+          <label className="block">
+            <span className="text-xs text-gray-500">Город</span>
+            <input className="w-full border rounded px-3 py-2 mt-1" value={form.city} onChange={set('city')} />
+          </label>
         </div>
 
         <div className="bg-white rounded-lg border p-4 space-y-3">
           <h2 className="font-semibold">Конфиденциальность</h2>
-          <label className="block text-sm text-gray-600">Кто может писать личные сообщения</label>
-          <select className="w-full border rounded px-3 py-2" value={form.who_can_message} onChange={set('who_can_message')}>
-            <option value={0}>Все пользователи</option>
-            <option value={1}>Только подписчики</option>
-          </select>
+          <label className="block">
+            <span className="text-sm text-gray-600">Кто может писать личные сообщения</span>
+            <select className="w-full border rounded px-3 py-2 mt-1" value={form.who_can_message} onChange={set('who_can_message')}>
+              <option value={0}>Все пользователи</option>
+              <option value={1}>Только подписчики</option>
+            </select>
+          </label>
         </div>
 
         <button

@@ -8,8 +8,7 @@ namespace UserService.API.Services
 {
     public class PostService(
         IPostRepository postRepo,
-        IDistributedCache distributedCache,
-        IFriendService friendService)
+        IDistributedCache distributedCache)
     {
         public async Task<Guid> AddPostAsync(Guid user_id, string post)
         {

@@ -11,15 +11,13 @@ public class PostServiceTests
 {
     private readonly Mock<IPostRepository> _repoMock;
     private readonly Mock<IDistributedCache> _cacheMock;
-    private readonly Mock<IFriendService> _friendMock;
     private readonly PostService _service;
 
     public PostServiceTests()
     {
         _repoMock = new Mock<IPostRepository>();
         _cacheMock = new Mock<IDistributedCache>();
-        _friendMock = new Mock<IFriendService>();
-        _service = new PostService(_repoMock.Object, _cacheMock.Object, _friendMock.Object);
+        _service = new PostService(_repoMock.Object, _cacheMock.Object);
     }
 
     [Fact]

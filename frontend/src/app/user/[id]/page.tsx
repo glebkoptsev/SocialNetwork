@@ -13,13 +13,14 @@ import { useAuth } from '@/lib/auth'
 const PAGE_SIZE = 20
 
 export default function UserPage() {
-  const { id } = useParams()
+  const { id } = useParams<{ id: string }>()
   const userId = useAuth((s) => s.userId)
   const router = useRouter()
 
-  const { data: user } = useQuery({
+  const { data: user, isLoading: userLoading, isError: userError } = useQuery({
     queryKey: ['user', id],
     queryFn: () => api.get<User>(`/api/user/get/${id}`).then((r) => r.data),
+    retry: false,
   })
 
   const { data: subscriptions } = useQuery({
@@ -84,7 +85,8 @@ export default function UserPage() {
     return () => observer.disconnect()
   }, [hasMore, offset, loadPosts])
 
-  if (!user) return <p className="text-gray-400 text-center">Загрузка...</p>
+  if (userLoading) return <p className="text-gray-400 text-center">Загрузка...</p>
+  if (userError || !user) return <p className="text-gray-400 text-center">Пользователь не найден.</p>
 
   return (
     <div className="space-y-4">
@@ -158,6 +160,9 @@ export default function UserPage() {
       ))}
       {loading && <p className="text-gray-400 text-center">Загрузка...</p>}
       {!loading && hasMore && <div ref={sentinelRef} className="h-4" />}
+      {!loading && posts.length === 0 && (
+        <p className="text-gray-400 text-center">У пользователя пока нет постов.</p>
+      )}
     </div>
   )
 }

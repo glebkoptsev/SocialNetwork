@@ -5,6 +5,8 @@ namespace UserService.CacheUpdateService
 {
     public class FeedOutboxStore(UserDbContext context) : IFeedOutboxStore
     {
+        private DateTime? lastPurge;
+
         public async Task<IReadOnlyList<OutboxRecord>> GetUnprocessedAsync(int batchSize, CancellationToken ct)
         {
             var records = await context.FeedOutbox
@@ -18,12 +20,21 @@ namespace UserService.CacheUpdateService
 
         public async Task MarkProcessedAsync(long id, CancellationToken ct)
         {
-            var record = await context.FeedOutbox.FirstOrDefaultAsync(o => o.Id == id, ct);
-            if (record is not null)
-            {
-                record.Processed_at = DateTime.UtcNow;
-                await context.SaveChangesAsync(ct);
-            }
+            await context.FeedOutbox
+                .Where(o => o.Id == id)
+                .ExecuteUpdateAsync(o => o.SetProperty(x => x.Processed_at, DateTime.UtcNow), ct);
+        }
+
+        public async Task PurgeProcessedAsync(CancellationToken ct)
+        {
+            if (lastPurge is not null && DateTime.UtcNow - lastPurge < TimeSpan.FromHours(1))
+                return;
+            lastPurge = DateTime.UtcNow;
+
+            var cutoff = DateTime.UtcNow.AddDays(-7);
+            await context.FeedOutbox
+                .Where(o => o.Processed_at != null && o.Processed_at < cutoff)
+                .ExecuteDeleteAsync(ct);
         }
     }
 }

@@ -8,9 +8,8 @@ namespace UserService.LiveFeedService.Controllers
     {
         public async Task Send(string message, string userId)
         {
-            bool canPublishMessages = Context.User!.Claims.FirstOrDefault(c => c.Type == "can_publish_messages")?.Value == bool.TrueString;
-            Console.WriteLine($"User {userId} canPublishMessages - {canPublishMessages} message {message}");
-            if (canPublishMessages)
+            var callerId = Context.UserIdentifier;
+            if (callerId == userId)
             {
                 await Clients.User(userId).SendAsync("Receive", message);
             }

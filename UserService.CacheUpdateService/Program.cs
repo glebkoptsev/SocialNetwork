@@ -37,11 +37,7 @@ namespace UserService.CacheUpdateService
                     services.AddSingleton<UserAuthService>();
                     services.AddStackExchangeRedisCache(options =>
                     {
-#if DEBUG
-                        options.Configuration = hostContext.Configuration.GetConnectionString("redis_debug");
-#else
                         options.Configuration = hostContext.Configuration.GetConnectionString("redis");
-#endif
                     });
                     services.AddHostedService<Worker>();
                     services.AddHostedService<OutboxPublisher>();

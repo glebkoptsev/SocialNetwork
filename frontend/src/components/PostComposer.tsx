@@ -2,18 +2,24 @@
 
 import { useState, FormEvent } from 'react'
 import { api } from '@/lib/api'
-import { useQueryClient } from '@tanstack/react-query'
 
 export default function PostComposer() {
   const [text, setText] = useState('')
-  const queryClient = useQueryClient()
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!text.trim()) return
-    await api.post('/api/post/create', { text })
-    setText('')
-    queryClient.invalidateQueries({ queryKey: ['feed'] })
+    setLoading(true)
+    setError('')
+    try {
+      await api.post('/api/post/create', { text })
+      setText('')
+    } catch {
+      setError('Не удалось опубликовать пост')
+    }
+    setLoading(false)
   }
 
   return (
@@ -24,10 +30,15 @@ export default function PostComposer() {
         placeholder="Что у вас на уме?"
         value={text}
         onChange={(e) => setText(e.target.value)}
+        maxLength={2000}
       />
+      {error && <p className="text-red-500 text-xs">{error}</p>}
       <div className="flex justify-end">
-        <button className="bg-blue-600 text-white rounded px-4 py-1.5 text-sm hover:bg-blue-700">
-          Опубликовать
+        <button
+          className="bg-blue-600 text-white rounded px-4 py-1.5 text-sm hover:bg-blue-700 disabled:opacity-50"
+          disabled={loading || !text.trim()}
+        >
+          {loading ? 'Публикация...' : 'Опубликовать'}
         </button>
       </div>
     </form>

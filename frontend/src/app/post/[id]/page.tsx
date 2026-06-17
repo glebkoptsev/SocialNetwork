@@ -7,14 +7,16 @@ import { Post } from '@/types'
 import PostCard from '@/components/PostCard'
 
 export default function PostPage() {
-  const { id } = useParams()
+  const { id } = useParams<{ id: string }>()
 
-  const { data } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['post', id],
     queryFn: () => api.get<Post>(`/api/post/get/${id}`).then((r) => r.data),
+    retry: false,
   })
 
-  if (!data) return <p className="text-gray-400 text-center">Загрузка...</p>
+  if (isLoading) return <p className="text-gray-400 text-center">Загрузка...</p>
+  if (isError || !data) return <p className="text-gray-400 text-center">Пост не найден.</p>
 
   return (
     <div>

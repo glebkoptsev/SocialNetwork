@@ -32,9 +32,8 @@ namespace UserService.API
             })
             .AddJwtBearer(o =>
             {
-#if DEBUG
-                o.RequireHttpsMetadata = false;
-#endif
+                if (builder.Environment.IsDevelopment())
+                    o.RequireHttpsMetadata = false;
                 o.SaveToken = true;
                 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
                 o.TokenValidationParameters = new TokenValidationParameters
@@ -79,11 +78,7 @@ namespace UserService.API
             });
             builder.Services.AddStackExchangeRedisCache(options =>
             {
-#if DEBUG
-                options.Configuration = builder.Configuration.GetConnectionString("redis_debug");
-#else
                 options.Configuration = builder.Configuration.GetConnectionString("redis");
-#endif
             });
             builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
             {
@@ -101,16 +96,21 @@ namespace UserService.API
             builder.Services.AddTransient<FriendService>();
             builder.Services.AddTransient<IPostRepository, PostRepository>();
             builder.Services.AddTransient<PostService>();
+            var corsOrigins = builder.Configuration["CORS:AllowedOrigins"]?.Split(",", StringSplitOptions.RemoveEmptyEntries) ?? ["http://localhost:3000"];
             builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>
-                p.WithOrigins("http://localhost:3000")
+                p.WithOrigins(corsOrigins)
                     .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                     .WithHeaders("authorization", "content-type", "x-requested-with")
                     .AllowCredentials()));
             var app = builder.Build();
             app.UseCors("Frontend");
+            app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
             app.UseMiddleware<RequestLoggingMiddleware>();
-            app.UseSwagger();
-            app.UseSwaggerUI();
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+            }
             app.UseRateLimiter();
             app.UseAuthentication();
             app.UseAuthorization();

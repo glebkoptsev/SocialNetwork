@@ -12,6 +12,8 @@ namespace Libraries.Web.Common.Settings
         private SigningCredentials? _signingCredentials;
         public SigningCredentials GetSigningCredentials()
         {
+            if (string.IsNullOrEmpty(Secret))
+                throw new InvalidOperationException("JWT Secret is not configured");
             return _signingCredentials ??= new(
                 new SymmetricSecurityKey(
                     Encoding.UTF8.GetBytes(Secret)

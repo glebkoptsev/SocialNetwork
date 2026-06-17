@@ -24,16 +24,35 @@ namespace UserService.CacheUpdateService
         IDistributedLock distributedLock) : BackgroundService
     {
         private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
+        private static readonly DistributedCacheEntryOptions CacheTtl = new() { SlidingExpiration = TimeSpan.FromHours(24) };
 
-#if DEBUG
-        private readonly string signalrHost = configuration["LiveFeedService:URL_Debug"]!;
-#else
         private readonly string signalrHost = configuration["LiveFeedService:URL"]!;
-#endif
 
         protected override async Task ExecuteAsync(CancellationToken ct)
         {
+            while (!ct.IsCancellationRequested)
+            {
+                try
+                {
+                    await RunConsumerAsync(ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Worker outer loop error: {e.Message}");
+                    await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                }
+            }
+        }
+
+        private async Task RunConsumerAsync(CancellationToken ct)
+        {
             HubConnection? connection = null;
+
+            // Connect to SignalR
             while (!ct.IsCancellationRequested)
             {
                 try
@@ -47,6 +66,7 @@ namespace UserService.CacheUpdateService
 
                     connection = new HubConnectionBuilder()
                         .WithUrl(signalrHost, x => x.AccessTokenProvider = () => Task.FromResult<string?>(token))
+                        .WithAutomaticReconnect()
                         .Build();
                     await connection.StartAsync(ct);
                     Console.WriteLine("Connected to SignalR hub");
@@ -59,38 +79,44 @@ namespace UserService.CacheUpdateService
                 }
             }
 
-            await using (connection!)
+            if (connection is null || ct.IsCancellationRequested) return;
+
+            // Connect to RabbitMQ
+            var settings = options.Value;
+            var factory = new ConnectionFactory
             {
-                var settings = options.Value;
-                var factory = new ConnectionFactory
-                {
-                    HostName = settings.Host,
-                    Port = settings.Port,
-                    UserName = settings.Username,
-                    Password = settings.Password,
-                    RequestedConnectionTimeout = TimeSpan.FromSeconds(5),
-                };
+                HostName = settings.Host,
+                Port = settings.Port,
+                UserName = settings.Username,
+                Password = settings.Password,
+                RequestedConnectionTimeout = TimeSpan.FromSeconds(5),
+            };
 
-                Console.WriteLine("Connecting RabbitMQ consumer...");
-                IConnection rabbitConnection = null!;
-                IChannel channel = null!;
-                for (int attempt = 1; attempt <= 10; attempt++)
+            Console.WriteLine("Connecting RabbitMQ consumer...");
+            IConnection rabbitConnection = null!;
+            IChannel channel = null!;
+            for (int attempt = 1; attempt <= 10; attempt++)
+            {
+                try
                 {
-                    try
-                    {
-                        rabbitConnection = await factory.CreateConnectionAsync();
-                        channel = await rabbitConnection.CreateChannelAsync();
-                        Console.WriteLine("RabbitMQ consumer connected");
-                        break;
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine($"Попытка {attempt}/10 подключения consumer к RabbitMQ: {e.Message}");
-                        if (attempt == 10) throw;
-                        await Task.Delay(TimeSpan.FromSeconds(3), ct);
-                    }
+                    rabbitConnection = await factory.CreateConnectionAsync();
+                    channel = await rabbitConnection.CreateChannelAsync();
+                    await channel.BasicQosAsync(0, 1, false, ct);
+                    Console.WriteLine("RabbitMQ consumer connected with prefetch=1");
+                    break;
                 }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Попытка {attempt}/10 подключения consumer к RabbitMQ: {e.Message}");
+                    if (attempt == 10) throw;
+                    await Task.Delay(TimeSpan.FromSeconds(3), ct);
+                }
+            }
 
+            await using (connection)
+            await using (rabbitConnection)
+            await using (channel)
+            {
                 var consumer = new AsyncEventingBasicConsumer(channel);
                 consumer.ReceivedAsync += async (_, args) =>
                 {
@@ -98,8 +124,7 @@ namespace UserService.CacheUpdateService
                     {
                         var body = args.Body.ToArray();
                         var messageText = Encoding.UTF8.GetString(body);
-                        var key = args.BasicProperties?.MessageId ?? args.RoutingKey;
-                        Console.WriteLine($"Обработка сообщения {messageText}; Ключ {key}");
+                        Console.WriteLine($"Обработка сообщения {messageText}");
 
                         var message = JsonSerializer.Deserialize<FeedUpdateMessage>(messageText, jsonOptions)!;
                         if (message.ActionType == ActionTypeEnum.FullReload)
@@ -110,10 +135,7 @@ namespace UserService.CacheUpdateService
                             return;
                         }
 
-                        await connection!.InvokeAsync("Send", messageText, key, ct);
-
                         var authorId = message.Author_id;
-                        Console.WriteLine($"Обработка автора {authorId}");
                         using var scope = scopeFactory.CreateScope();
                         var dbContext = scope.ServiceProvider.GetRequiredService<UserDbContext>();
                         var followerIds = await dbContext.Friends
@@ -133,10 +155,11 @@ namespace UserService.CacheUpdateService
                             {
                                 await ModifyCacheAsync($"feed-{followerId}", async (cached, _) =>
                                 {
-                                    Console.WriteLine($"Удаление поста {message.Post_id}");
                                     cached.RemoveAll(p => p.Post_id == message.Post_id);
                                     return cached.Count > 0 ? cached : null;
                                 }, ct);
+
+                                await NotifyFollowerAsync(connection, followerId, messageText, ct);
                             }
                         }
                         else
@@ -151,7 +174,6 @@ namespace UserService.CacheUpdateService
                                 {
                                     if (message.ActionType == ActionTypeEnum.Create && cached.All(f => f.Post_id != message.Post_id.Value))
                                     {
-                                        Console.WriteLine($"Добавление поста {message.Post_id} для {followerId}");
                                         cached.Add(post);
                                         if (cached.Count > 1000)
                                         {
@@ -166,7 +188,6 @@ namespace UserService.CacheUpdateService
                                         var idx = cached.FindIndex(f => f.Post_id == message.Post_id.Value);
                                         if (idx >= 0)
                                         {
-                                            Console.WriteLine($"Обновление поста {message.Post_id} для {followerId}");
                                             cached[idx] = post;
                                             return cached;
                                         }
@@ -174,6 +195,8 @@ namespace UserService.CacheUpdateService
 
                                     return null;
                                 }, ct);
+
+                                await NotifyFollowerAsync(connection, followerId, messageText, ct);
                             }
                         }
 
@@ -182,25 +205,71 @@ namespace UserService.CacheUpdateService
                     catch (Exception e)
                     {
                         Console.WriteLine(e.ToString());
-                        await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: true, cancellationToken: ct);
+                        var retryCount = GetRetryCount(args);
+                        if (retryCount < 3)
+                        {
+                            await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: true, cancellationToken: ct);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Message dropped after {retryCount} retries: {Encoding.UTF8.GetString(args.Body.ToArray())}");
+                            await channel.BasicAckAsync(args.DeliveryTag, multiple: false, cancellationToken: ct);
+                        }
                     }
                 };
 
                 await channel.BasicConsumeAsync(queue: "feed-posts", autoAck: false, consumer: consumer, cancellationToken: ct);
 
-                await Task.Delay(Timeout.Infinite, ct);
+                // Wait for cancellation or connection loss
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Normal shutdown
+                }
+            }
+        }
 
-                await channel.DisposeAsync();
-                await rabbitConnection.DisposeAsync();
+        private static int GetRetryCount(BasicDeliverEventArgs args)
+        {
+            if (args.BasicProperties?.Headers?.TryGetValue("x-retry-count", out var retryObj) == true
+                && retryObj is byte[] bytes)
+            {
+                return BitConverter.ToInt32(bytes, 0);
+            }
+            return 0;
+        }
+
+        private static async Task NotifyFollowerAsync(HubConnection connection, Guid followerId, string message, CancellationToken ct)
+        {
+            try
+            {
+                if (connection.State == HubConnectionState.Connected)
+                {
+                    await connection.InvokeAsync("Send", message, followerId.ToString(), ct);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"SignalR notify failed for {followerId}: {e.Message}");
             }
         }
 
         private async Task ReloadFeedAsync(Guid user_id, string key, CancellationToken ct)
         {
+            await using var lockHandle = await distributedLock.AcquireAsync($"lock:{key}", TimeSpan.FromSeconds(30));
+            if (lockHandle is null)
+            {
+                Console.WriteLine($"Failed to acquire lock for {key}, skipping reload");
+                return;
+            }
+
             using var scope = scopeFactory.CreateScope();
             var postRepo = scope.ServiceProvider.GetRequiredService<IPostRepository>();
             var feedFromDb = await postRepo.GetFeedAsync(user_id, 0, 1000);
-            await cache.SetStringAsync(key, JsonSerializer.Serialize(feedFromDb, jsonOptions), ct);
+            await cache.SetStringAsync(key, JsonSerializer.Serialize(feedFromDb, jsonOptions), CacheTtl, ct);
         }
 
         private async Task ModifyCacheAsync(string key, Func<List<Post>, CancellationToken, Task<List<Post>?>> modify, CancellationToken ct)
@@ -208,10 +277,7 @@ namespace UserService.CacheUpdateService
             var lockKey = $"lock:{key}";
             await using var handle = await distributedLock.AcquireAsync(lockKey, TimeSpan.FromSeconds(10));
             if (handle is null)
-            {
-                Console.WriteLine($"Failed to acquire lock for {key}, skipping");
-                return;
-            }
+                throw new InvalidOperationException($"Failed to acquire lock for {key}");
 
             var cachedFeedJson = await cache.GetStringAsync(key, ct);
             List<Post> cachedFeed;
@@ -219,7 +285,6 @@ namespace UserService.CacheUpdateService
             if (cachedFeedJson is null)
             {
                 wasCacheMiss = true;
-                Console.WriteLine($"Cache miss for {key}, reloading from DB");
                 using var scope = scopeFactory.CreateScope();
                 var postRepo = scope.ServiceProvider.GetRequiredService<IPostRepository>();
                 var userId = Guid.Parse(key.AsSpan(5));
@@ -232,9 +297,9 @@ namespace UserService.CacheUpdateService
 
             var result = await modify(cachedFeed, ct);
             if (result is not null)
-                await cache.SetStringAsync(key, JsonSerializer.Serialize(result, jsonOptions), ct);
+                await cache.SetStringAsync(key, JsonSerializer.Serialize(result, jsonOptions), CacheTtl, ct);
             else if (wasCacheMiss)
-                await cache.SetStringAsync(key, JsonSerializer.Serialize(cachedFeed, jsonOptions), ct);
+                await cache.SetStringAsync(key, JsonSerializer.Serialize(cachedFeed, jsonOptions), CacheTtl, ct);
         }
     }
 }

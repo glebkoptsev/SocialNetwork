@@ -1,4 +1,5 @@
 using Libraries.RabbitMQ;
+using Microsoft.EntityFrameworkCore;
 
 namespace UserService.CacheUpdateService
 {
@@ -26,6 +27,9 @@ namespace UserService.CacheUpdateService
                         await rabbitMQPublisher.PublishAsync("feed-posts", "feed-posts", record.KafkaValue);
                         await outboxStore.MarkProcessedAsync(record.Id, ct);
                     }
+
+                    // Purge old processed records periodically
+                    await outboxStore.PurgeProcessedAsync(ct);
                 }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {

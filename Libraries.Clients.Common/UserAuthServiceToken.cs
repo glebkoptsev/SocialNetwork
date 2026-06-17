@@ -4,7 +4,7 @@
     {
         public string Access_token { get; set; } = null!;
         public int ExpiresIn { get; set; }
-        private readonly DateTime _createdAt = DateTime.Now;
-        public bool IsExpired => (DateTime.Now - _createdAt).TotalSeconds > ExpiresIn - 120;
+        private readonly DateTime _createdAt = DateTime.UtcNow;
+        public bool IsExpired => (DateTime.UtcNow - _createdAt).TotalSeconds > ExpiresIn - 120;
     }
 }

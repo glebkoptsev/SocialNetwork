@@ -18,22 +18,27 @@ export default function ChatPage() {
   const userId = useAuth((s) => s.userId)
   const queryClient = useQueryClient()
   const [text, setText] = useState('')
+  const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
-  const scrolled = useRef(false)
+  const messageCountRef = useRef(0)
+  const readRef = useRef(false)
 
-  const { data: messages } = useQuery({
+  const { data: messages, isLoading } = useQuery({
     queryKey: ['messages', chatId],
     queryFn: () =>
       dialogApi.get<Message[]>(`/api/dialog/${chatId}/messages`).then((r) => r.data),
   })
 
-  console.log({ userId, messagesCount: messages?.length, firstMsg: messages?.[0] })
-
   const sendMutation = useMutation({
     mutationFn: (message: string) =>
       dialogApi.post(`/api/dialog/${chatId}/send`, { message }),
     onSuccess: () => {
+      setText('')
+      setError('')
       queryClient.invalidateQueries({ queryKey: ['messages', chatId] })
+    },
+    onError: (err: any) => {
+      setError(err?.response?.data?.error || 'Ошибка отправки')
     },
   })
 
@@ -41,22 +46,31 @@ export default function ChatPage() {
     e.preventDefault()
     if (!text.trim()) return
     sendMutation.mutate(text)
-    setText('')
   }
 
-  useEffect(() => {
-    if (scrolled.current || !messages?.length) return
-    scrolled.current = true
-    setTimeout(() => bottomRef.current?.scrollIntoView(), 0)
-  }, [messages])
-
+  // Auto-scroll on new messages
   useEffect(() => {
     if (!messages?.length) return
+    const isNewMessage = messages.length !== messageCountRef.current
+    messageCountRef.current = messages.length
+    if (isNewMessage) {
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    }
+  }, [messages])
+
+  // Mark as read once per chat open, not on every refetch
+  useEffect(() => {
+    if (readRef.current || !messages?.length) return
+    const hasUnread = messages.some((m) => m.user_id !== userId && m.status < 2)
+    if (!hasUnread) return
+    readRef.current = true
     const timer = setTimeout(() => {
       dialogApi.post(`/api/dialog/${chatId}/read`).catch(() => {})
     }, 1000)
     return () => clearTimeout(timer)
-  }, [messages, chatId])
+  }, [messages, chatId, userId])
+
+  if (isLoading) return <p className="text-gray-400 text-center">Загрузка...</p>
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
@@ -84,6 +98,7 @@ export default function ChatPage() {
         </div>
         <div ref={bottomRef} />
       </div>
+      {error && <p className="text-red-500 text-xs text-center py-1">{error}</p>}
       <form onSubmit={handleSubmit} className="flex gap-2 border p-2 bg-white rounded-b-lg">
         <input
           className="flex-1 border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
@@ -91,8 +106,11 @@ export default function ChatPage() {
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-        <button className="bg-blue-600 text-white rounded-lg px-5 py-2 text-sm hover:bg-blue-700 whitespace-nowrap">
-          Отправить
+        <button
+          className="bg-blue-600 text-white rounded-lg px-5 py-2 text-sm hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+          disabled={sendMutation.isPending}
+        >
+          {sendMutation.isPending ? '...' : 'Отправить'}
         </button>
       </form>
     </div>

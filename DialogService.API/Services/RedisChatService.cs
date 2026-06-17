@@ -1,27 +1,19 @@
 ﻿using DialogService.API.DTOs;
 using DialogService.Database.Entities;
+using Libraries.Web.Common.Caching;
 using Libraries.Web.Common.Clients;
 using StackExchange.Redis;
 using System.Text.Json;
 
 namespace DialogService.API.Services
 {
-    public class RedisChatService : IChatService, IDisposable, IAsyncDisposable
+    public class RedisChatService(
+        IConnectionMultiplexer redis,
+        UserServiceClient userService,
+        IDistributedLock distributedLock) : IChatService
     {
-        private readonly ConnectionMultiplexer redis;
+        private readonly ConnectionMultiplexer redis = (ConnectionMultiplexer)redis;
         private readonly JsonSerializerOptions jsonOptions = new(JsonSerializerDefaults.Web);
-        private readonly UserServiceClient userService;
-
-        public RedisChatService(IConfiguration configuration, UserServiceClient userService)
-        {
-#if DEBUG
-            var connectionString = configuration.GetConnectionString("redis_debug")!;
-#else
-            var connectionString = configuration.GetConnectionString("redis")!;
-#endif
-            redis = ConnectionMultiplexer.Connect(connectionString);
-            this.userService = userService;
-        }
 
         public async Task<Guid> CreateChatAsync(CreateChatRequest request, Guid creator_id)
         {
@@ -29,18 +21,19 @@ namespace DialogService.API.Services
             if (!request.Users_ids.Contains(creator_id))
                 request.Users_ids.Add(creator_id);
 
+            var chatId = Guid.NewGuid();
             var chat = new RedisChat
             {
-                Id = Guid.NewGuid(),
+                Id = chatId,
                 Name = request.Name,
                 Users = request.Users_ids,
-                Created_at = DateTime.Now
+                Created_at = DateTime.UtcNow
             };
-            await db.StringSetAsync($"chat-{chat.Id}", JsonSerializer.Serialize(chat, jsonOptions));
+            await db.StringSetAsync($"chat-{chatId}", JsonSerializer.Serialize(chat, jsonOptions));
 
             var chatEntity = new Chat
             {
-                Chat_id = chat.Id,
+                Chat_id = chatId,
                 Chat_name = chat.Name,
                 Creation_datetime = chat.Created_at,
                 Creator_id = creator_id
@@ -48,26 +41,20 @@ namespace DialogService.API.Services
 
             foreach (var user_id in request.Users_ids)
             {
-                var remoteUser = await userService.GetUserAsync(user_id);
-                if (remoteUser is null) continue;
-
                 var user_chats_res = await db.StringGetAsync($"user_chats-{user_id}");
-
                 if (user_chats_res.IsNullOrEmpty)
                 {
-                    var new_user_chats = new RedisUserChats
-                    {
-                        User_id = user_id,
-                        Chats = [chatEntity]
-                    };
-                    await db.StringSetAsync($"user_chats-{user_id}", JsonSerializer.Serialize(new_user_chats, jsonOptions));
-                    continue;
+                    await db.StringSetAsync($"user_chats-{user_id}", JsonSerializer.Serialize(
+                        new RedisUserChats { User_id = user_id, Chats = [chatEntity] }, jsonOptions));
                 }
-                var user_chats = JsonSerializer.Deserialize<RedisUserChats>((string)user_chats_res!, jsonOptions)!;
-                user_chats.Chats.Add(chatEntity);
-                await db.StringSetAsync($"user_chats-{user_id}", JsonSerializer.Serialize(user_chats, jsonOptions));
+                else
+                {
+                    var user_chats = JsonSerializer.Deserialize<RedisUserChats>((string)user_chats_res!, jsonOptions)!;
+                    user_chats.Chats.Add(chatEntity);
+                    await db.StringSetAsync($"user_chats-{user_id}", JsonSerializer.Serialize(user_chats, jsonOptions));
+                }
             }
-            return chat.Id;
+            return chatId;
         }
 
         public async Task<Guid> CreateOrGetPersonalChatAsync(Guid currentUserId, Guid targetUserId)
@@ -78,9 +65,7 @@ namespace DialogService.API.Services
 
             var personalKey = $"personal:{minId}:{maxId}";
             var db = redis.GetDatabase(0);
-            var existing = await db.StringGetAsync(personalKey);
 
-            // Check privacy setting of target user even if chat exists in cache
             var targetUser = await userService.GetUserAsync(targetUserId);
             if (targetUser is null)
                 throw new KeyNotFoundException("Target user not found");
@@ -92,7 +77,17 @@ namespace DialogService.API.Services
                     throw new UnauthorizedAccessException("User allows messages only from subscribers");
             }
 
+            var existing = await db.StringGetAsync(personalKey);
             if (!existing.IsNullOrEmpty && Guid.TryParse((string)existing!, out var existingChatId))
+                return existingChatId;
+
+            await using var lockHandle = await distributedLock.AcquireAsync(
+                $"lock:{personalKey}", TimeSpan.FromSeconds(10));
+            if (lockHandle is null)
+                throw new InvalidOperationException("Chat creation in progress, try again");
+
+            existing = await db.StringGetAsync(personalKey);
+            if (!existing.IsNullOrEmpty && Guid.TryParse((string)existing!, out existingChatId))
                 return existingChatId;
 
             var chatId = Guid.NewGuid();
@@ -101,7 +96,7 @@ namespace DialogService.API.Services
                 Id = chatId,
                 Name = $"{targetUser.First_name} {targetUser.Second_name}",
                 Users = [currentUserId, targetUserId],
-                Created_at = DateTime.Now
+                Created_at = DateTime.UtcNow
             };
             await db.StringSetAsync($"chat-{chatId}", JsonSerializer.Serialize(chat, jsonOptions));
             await db.StringSetAsync(personalKey, chatId.ToString());
@@ -141,6 +136,9 @@ namespace DialogService.API.Services
             var chat = JsonSerializer.Deserialize<RedisChat>(chat_res.ToString(), jsonOptions);
             if (chat is null) return [];
 
+            if (!chat.Users.Contains(user_id))
+                throw new UnauthorizedAccessException("User is not a member of this chat");
+
             var changed = false;
             foreach (var m in chat.Messages.Where(m => m.User_id != user_id && m.Status < 1))
             {
@@ -148,7 +146,12 @@ namespace DialogService.API.Services
                 m.Status = 1;
             }
             if (changed)
-                await db.StringSetAsync($"chat-{chat_id}", JsonSerializer.Serialize(chat, jsonOptions));
+            {
+                await using var lockHandle = await distributedLock.AcquireAsync(
+                    $"lock:chat-{chat_id}", TimeSpan.FromSeconds(5));
+                if (lockHandle is not null)
+                    await db.StringSetAsync($"chat-{chat_id}", JsonSerializer.Serialize(chat, jsonOptions));
+            }
 
             return chat.Messages.OrderBy(m => m.Created_at).Skip(offset).Take(limit)
                 .Select(m => new MessageDto 
@@ -163,14 +166,21 @@ namespace DialogService.API.Services
                 }).ToArray();
         }
 
-        public async Task<List<Chat>> GetUserChatListAsync(Guid user_id, int limit, int offset)
+        public async Task<List<ChatDto>> GetUserChatListAsync(Guid user_id, int limit, int offset)
         {
             var db = redis.GetDatabase(0);
             var user_chats_res = await db.StringGetAsync($"user_chats-{user_id}");
             if (user_chats_res.IsNullOrEmpty) return [];
             var user_chats = JsonSerializer.Deserialize<RedisUserChats>(user_chats_res.ToString(), jsonOptions);
             if (user_chats is null) return [];
-            return user_chats.Chats.OrderByDescending(m => m.Creation_datetime).Skip(offset).Take(limit).ToList();
+            return user_chats.Chats.OrderByDescending(m => m.Creation_datetime).Skip(offset).Take(limit)
+                .Select(c => new ChatDto
+                {
+                    Chat_id = c.Chat_id,
+                    Creator_id = c.Creator_id,
+                    Chat_name = c.Chat_name,
+                    Creation_datetime = c.Creation_datetime
+                }).ToList();
         }
 
         public async Task<Guid> SendMessageToChatAsync(Guid chat_id, SendMessageRequest request, Guid creator_id)
@@ -186,13 +196,21 @@ namespace DialogService.API.Services
             var senderName = senderUser?.First_name ?? "Unknown";
             var msg = new RedisChatMessage
             {
-                Created_at = DateTime.Now,
+                Created_at = DateTime.UtcNow,
                 Message_id = Guid.NewGuid(),
                 Text = request.Message,
                 User_id = creator_id,
                 User_name = senderName,
                 Status = 0
             };
+
+            await using var lockHandle = await distributedLock.AcquireAsync(
+                $"lock:chat-{chat_id}", TimeSpan.FromSeconds(5));
+            if (lockHandle is null)
+                throw new InvalidOperationException("Chat is busy, try again");
+
+            chat_res = await db.StringGetAsync($"chat-{chat_id}");
+            chat = JsonSerializer.Deserialize<RedisChat>(chat_res.ToString(), jsonOptions)!;
             chat.Messages.Add(msg);
             await db.StringSetAsync($"chat-{chat_id}", JsonSerializer.Serialize(chat, jsonOptions));
             return msg.Message_id;
@@ -206,6 +224,9 @@ namespace DialogService.API.Services
             var chat = JsonSerializer.Deserialize<RedisChat>(chat_res.ToString(), jsonOptions);
             if (chat is null) return;
 
+            if (!chat.Users.Contains(user_id))
+                throw new UnauthorizedAccessException("User is not a member of this chat");
+
             var changed = false;
             foreach (var m in chat.Messages.Where(m => m.User_id != user_id && m.Status < 2))
             {
@@ -213,10 +234,12 @@ namespace DialogService.API.Services
                 m.Status = 2;
             }
             if (changed)
-                await db.StringSetAsync($"chat-{chat_id}", JsonSerializer.Serialize(chat, jsonOptions));
+            {
+                await using var lockHandle = await distributedLock.AcquireAsync(
+                    $"lock:chat-{chat_id}", TimeSpan.FromSeconds(5));
+                if (lockHandle is not null)
+                    await db.StringSetAsync($"chat-{chat_id}", JsonSerializer.Serialize(chat, jsonOptions));
+            }
         }
-
-        public void Dispose() { redis.Dispose(); GC.SuppressFinalize(this); }
-        public async ValueTask DisposeAsync() { await redis.DisposeAsync(); GC.SuppressFinalize(this); }
     }
 }

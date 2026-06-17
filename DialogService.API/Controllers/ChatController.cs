@@ -1,6 +1,5 @@
 using DialogService.API.DTOs;
 using DialogService.API.Services;
-using DialogService.Database.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -17,11 +16,18 @@ namespace DialogService.API.Controllers
         public async Task<ActionResult<MessageDto[]>> GetChatAsync(Guid chat_id, int limit = 1000, int offset = 0)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
-            return Ok(await chatService.GetChatAsync(chat_id, limit, offset, currentUserId));
+            try
+            {
+                return Ok(await chatService.GetChatAsync(chat_id, limit, offset, currentUserId));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { error = ex.Message });
+            }
         }
 
         [HttpGet, Route("list")]
-        public async Task<ActionResult<Chat[]>> GetUserChatListAsync(int offset = 0, int limit = 200)
+        public async Task<ActionResult<List<ChatDto>>> GetUserChatListAsync(int offset = 0, int limit = 20)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
             return Ok(await chatService.GetUserChatListAsync(currentUserId, limit, offset));
@@ -31,7 +37,18 @@ namespace DialogService.API.Controllers
         public async Task<ActionResult<Guid>> SendMessageToChatAsync([FromRoute] Guid chat_id, [FromBody] SendMessageRequest request)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
-            return Ok(await chatService.SendMessageToChatAsync(chat_id, request, currentUserId));
+            try
+            {
+                return Ok(await chatService.SendMessageToChatAsync(chat_id, request, currentUserId));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { error = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
         }
 
         [HttpPost]
@@ -45,8 +62,15 @@ namespace DialogService.API.Controllers
         public async Task<IActionResult> MarkChatAsRead(Guid chat_id)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
-            await chatService.MarkChatAsReadAsync(chat_id, currentUserId);
-            return Ok();
+            try
+            {
+                await chatService.MarkChatAsReadAsync(chat_id, currentUserId);
+                return Ok();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { error = ex.Message });
+            }
         }
 
         [HttpPost, Route("personal/{user_id}")]
@@ -60,6 +84,10 @@ namespace DialogService.API.Controllers
             catch (UnauthorizedAccessException ex)
             {
                 return StatusCode(403, new { error = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
             }
         }
     }

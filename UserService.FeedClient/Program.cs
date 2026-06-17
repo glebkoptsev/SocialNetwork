@@ -20,8 +20,8 @@ namespace UserService.FeedClient
                 {
                     services.AddOptions();
                     services.Configure<UserAuthServiceOptions>(hostContext.Configuration.GetSection("AuthService"));
-                    services.AddHttpClient<UserAuthService>();
-                    services.AddScoped<UserAuthService>();
+                    services.AddHttpClient();
+                    services.AddSingleton<UserAuthService>();
                     services.AddHostedService<FeedClientSrv>();
                 }).Build();
         }
