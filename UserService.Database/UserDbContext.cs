@@ -3,7 +3,7 @@ using UserService.Database.Entities;
 
 namespace UserService.Database
 {
-    public class UserDbContext(DbContextOptions<UserDbContext> options) : DbContext(options)
+    public class UserDbContext(DbContextOptions options) : DbContext(options)
     {
         public DbSet<User> Users => Set<User>();
         public DbSet<FriendEntity> Friends => Set<FriendEntity>();

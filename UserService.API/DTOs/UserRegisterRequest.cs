@@ -16,7 +16,7 @@ namespace UserService.API.DTOs
         public string Biography { get; set; } = null!;
         [StringLength(255)]
         public string City { get; set; } = null!;
-        [Required, StringLength(255, MinimumLength = 6)]
+        [Required, StringLength(255, MinimumLength = 5)]
         public string Password { get; set; } = null!;
     }
 }
