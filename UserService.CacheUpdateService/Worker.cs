@@ -162,9 +162,18 @@ namespace UserService.CacheUpdateService
                             return;
                         }
 
+                        // HL1: fan-out only to active followers, others get feed on read from DB
+                        var activeIds = new List<Guid>();
+                        foreach (var fid in followerIds)
+                        {
+                            var active = await cache.GetStringAsync($"active:{fid}", ct);
+                            if (active is not null) activeIds.Add(fid);
+                        }
+                        logger.LogInformation("Fan-out: {Active}/{Total} followers active", activeIds.Count, followerIds.Count);
+
                         if (message.ActionType == ActionTypeEnum.Delete)
                         {
-                            foreach (var followerId in followerIds)
+                            foreach (var followerId in activeIds)
                             {
                                 await ModifyCacheAsync($"feed-{followerId}", async (cached, _) =>
                                 {
@@ -180,7 +189,7 @@ namespace UserService.CacheUpdateService
                             var post = await postRepo.GetPostAsync(message.Post_id!.Value)
                                 ?? throw new Exception($"post {message.Post_id.Value} not found in db");
 
-                            foreach (var followerId in followerIds)
+                            foreach (var followerId in activeIds)
                             {
                                 await ModifyCacheAsync($"feed-{followerId}", async (cached, _) =>
                                 {

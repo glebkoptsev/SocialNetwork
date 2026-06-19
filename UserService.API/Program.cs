@@ -125,6 +125,7 @@ namespace UserService.API
             app.UseRateLimiter();
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseMiddleware<ActiveUserMiddleware>();
             app.MapControllers();
             app.MapHub<FeedHub>("/post/feed/posted");
 
