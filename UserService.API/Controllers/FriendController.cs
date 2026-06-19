@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using UserService.API.DTOs;
 using UserService.API.Services;
@@ -47,7 +48,7 @@ namespace UserService.API.Controllers
             return Ok(await friendService.IsFriendAsync(currentUserId, friendGuid));
         }
 
-        [HttpPut, Route("set/{friend_id}"), Authorize]
+        [HttpPut, Route("set/{friend_id}"), Authorize, EnableRateLimiting("FriendMutatePolicy")]
         public async Task<IActionResult> Subscribe(string friend_id)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
@@ -58,7 +59,7 @@ namespace UserService.API.Controllers
             return Ok();
         }
 
-        [HttpPut, Route("delete/{friend_id}"), Authorize]
+        [HttpPut, Route("delete/{friend_id}"), Authorize, EnableRateLimiting("FriendMutatePolicy")]
         public async Task<IActionResult> Unsubscribe(string friend_id)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);

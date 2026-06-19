@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using UserService.API.DTOs;
 using UserService.API.Services;
@@ -36,7 +37,7 @@ namespace UserService.API.Controllers
             return Ok(posts.Select(p => p.ToResponse()).ToArray());
         }
 
-        [HttpPost, Route("create"), Authorize]
+        [HttpPost, Route("create"), Authorize, EnableRateLimiting("PostCreatePolicy")]
         public async Task<ActionResult<Guid>> AddPost([FromBody] AddPostRequest request)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);

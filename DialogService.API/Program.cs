@@ -7,11 +7,13 @@ using Libraries.Web.Common.Middlewares;
 using Libraries.Web.Common.Settings;
 using Libraries.Web.Common.Swagger;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
+using System.Threading.RateLimiting;
 
 namespace DialogService.API
 {
@@ -46,6 +48,24 @@ namespace DialogService.API
             });
 
             builder.Services.AddAuthorization();
+            builder.Services.AddRateLimiter(o =>
+            {
+                o.AddFixedWindowLimiter("ChatSendPolicy", c =>
+                {
+                    c.PermitLimit = 30;
+                    c.Window = TimeSpan.FromMinutes(1);
+                    c.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    c.QueueLimit = 0;
+                });
+                o.AddFixedWindowLimiter("ChatCreatePolicy", c =>
+                {
+                    c.PermitLimit = 10;
+                    c.Window = TimeSpan.FromMinutes(1);
+                    c.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    c.QueueLimit = 0;
+                });
+                o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            });
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(o =>
@@ -100,6 +120,7 @@ namespace DialogService.API
             }
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseRateLimiter();
             app.MapControllers();
 
             // Apply migrations

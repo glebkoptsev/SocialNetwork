@@ -69,6 +69,20 @@ namespace UserService.API
                     c.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
                     c.QueueLimit = 0;
                 });
+                o.AddFixedWindowLimiter("PostCreatePolicy", c =>
+                {
+                    c.PermitLimit = 10;
+                    c.Window = TimeSpan.FromMinutes(1);
+                    c.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    c.QueueLimit = 0;
+                });
+                o.AddFixedWindowLimiter("FriendMutatePolicy", c =>
+                {
+                    c.PermitLimit = 30;
+                    c.Window = TimeSpan.FromMinutes(1);
+                    c.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    c.QueueLimit = 0;
+                });
                 o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             });
             builder.Services.AddControllers();
@@ -122,9 +136,9 @@ namespace UserService.API
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
-            app.UseRateLimiter();
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseRateLimiter();
             app.UseMiddleware<ActiveUserMiddleware>();
             app.MapControllers();
             app.MapHub<FeedHub>("/post/feed/posted");

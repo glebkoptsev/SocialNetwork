@@ -2,6 +2,7 @@ using DialogService.API.DTOs;
 using DialogService.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace DialogService.API.Controllers
@@ -33,7 +34,7 @@ namespace DialogService.API.Controllers
             return Ok(await chatService.GetUserChatListAsync(currentUserId, limit, offset));
         }
 
-        [HttpPost, Route("{chat_id}/send")]
+        [HttpPost, Route("{chat_id}/send"), EnableRateLimiting("ChatSendPolicy")]
         public async Task<ActionResult<Guid>> SendMessageToChatAsync([FromRoute] Guid chat_id, [FromBody] SendMessageRequest request)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
@@ -51,7 +52,7 @@ namespace DialogService.API.Controllers
             }
         }
 
-        [HttpPost]
+        [HttpPost, EnableRateLimiting("ChatCreatePolicy")]
         public async Task<ActionResult<Guid>> CreateChatAsync(CreateChatRequest request)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
@@ -73,7 +74,7 @@ namespace DialogService.API.Controllers
             }
         }
 
-        [HttpPost, Route("personal/{user_id}")]
+        [HttpPost, Route("personal/{user_id}"), EnableRateLimiting("ChatCreatePolicy")]
         public async Task<ActionResult<Guid>> CreateOrGetPersonalChatAsync(Guid user_id)
         {
             var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
