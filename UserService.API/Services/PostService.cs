@@ -50,11 +50,11 @@ namespace UserService.API.Services
             return await postRepo.ToggleLikeAsync(post_id, user_id);
         }
 
-        public async Task<Post?> GetPostAsync(Guid post_id)
+        public async Task<Post?> GetPostAsync(Guid post_id, Guid? currentUserId = null)
         {
             try
             {
-                return await postRepo.GetPostAsync(post_id);
+                return await postRepo.GetPostAsync(post_id, currentUserId);
             }
             catch (NpgsqlException)
             {
@@ -62,11 +62,11 @@ namespace UserService.API.Services
             }
         }
 
-        public async Task<IEnumerable<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit)
+        public async Task<IEnumerable<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit, Guid? currentUserId = null)
         {
             try
             {
-                return await postRepo.GetUserPostsAsync(author_id, offset, limit);
+                return await postRepo.GetUserPostsAsync(author_id, offset, limit, currentUserId);
             }
             catch (NpgsqlException)
             {

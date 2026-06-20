@@ -15,7 +15,8 @@ namespace UserService.API.Controllers
         [HttpGet, Route("get/{post_id}"), Authorize]
         public async Task<ActionResult<PostResponse>> GetPost(Guid post_id)
         {
-            var post = await postService.GetPostAsync(post_id);
+            var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
+            var post = await postService.GetPostAsync(post_id, currentUserId);
             return post is null ? NotFound() : Ok(post.ToResponse());
         }
 
@@ -27,7 +28,8 @@ namespace UserService.API.Controllers
             {
                 var authorId = await usersService.ResolveUserIdAsync(user_id);
                 if (authorId == Guid.Empty) return NotFound();
-                posts = await postService.GetUserPostsAsync(authorId, offset, limit);
+                var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
+                posts = await postService.GetUserPostsAsync(authorId, offset, limit, currentUserId);
             }
             else
             {

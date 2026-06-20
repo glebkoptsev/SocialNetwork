@@ -7,9 +7,9 @@ namespace UserService.Database
         Task<Guid> AddPostAsync(Guid user_id, string post, Guid postId, OutboxEntry? outboxEntry = null);
         Task UpdatePostAsync(Guid post_id, string post, Guid user_id, OutboxEntry? outboxEntry = null);
         Task DeletePostAsync(Guid post_id, Guid user_id, OutboxEntry? outboxEntry = null);
-        Task<Post?> GetPostAsync(Guid post_id);
+        Task<Post?> GetPostAsync(Guid post_id, Guid? currentUserId = null);
         Task<List<Post>> GetFeedAsync(Guid user_id, Guid? currentUserId, int offset, int limit);
-        Task<List<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit);
+        Task<List<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit, Guid? currentUserId = null);
         Task<(bool Liked, int LikeCount)> ToggleLikeAsync(Guid post_id, Guid user_id);
     }
 }

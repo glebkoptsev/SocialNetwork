@@ -74,7 +74,7 @@ namespace UserService.Database
             await writeDb.SaveChangesAsync();
         }
 
-        public async Task<Post?> GetPostAsync(Guid post_id)
+        public async Task<Post?> GetPostAsync(Guid post_id, Guid? currentUserId = null)
         {
             var post = await writeDb.Posts
                 .Where(p => p.Post_id == post_id)
@@ -89,10 +89,12 @@ namespace UserService.Database
                     LikeCount = p.LikeCount
                 })
                 .FirstOrDefaultAsync();
+            if (post is not null && currentUserId.HasValue)
+                post.HasLiked = await writeDb.Likes.AnyAsync(l => l.Post_id == post_id && l.User_id == currentUserId.Value);
             return post;
         }
 
-        public async Task<List<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit)
+        public async Task<List<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit, Guid? currentUserId = null)
         {
             var userPosts = from p in readDb.Posts
                             join u in readDb.Users on p.User_id equals u.User_id
@@ -108,11 +110,24 @@ namespace UserService.Database
                     LikeCount = p.LikeCount
                             };
 
-            return await userPosts
+            var posts = await userPosts
                 .OrderByDescending(p => p.Creation_datetime)
                 .Skip(offset)
                 .Take(limit)
                 .ToListAsync();
+
+            if (currentUserId.HasValue && posts.Count > 0)
+            {
+                var postIds = posts.Select(p => p.Post_id).ToList();
+                var likedIds = await readDb.Likes
+                    .Where(l => l.User_id == currentUserId.Value && postIds.Contains(l.Post_id))
+                    .Select(l => l.Post_id)
+                    .ToListAsync();
+                foreach (var p in posts)
+                    p.HasLiked = likedIds.Contains(p.Post_id);
+            }
+
+            return posts;
         }
 
         public async Task<List<Post>> GetFeedAsync(Guid user_id, Guid? currentUserId, int offset, int limit)
