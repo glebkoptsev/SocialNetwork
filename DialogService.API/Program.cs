@@ -101,12 +101,12 @@ namespace DialogService.API
             builder.Services.AddDbContextPool<DialogDbContext>(options =>
             {
                 var connStr = builder.Configuration.GetConnectionString("postgres");
-                options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
+                options.UseNpgsql(connStr!, o => o.CommandTimeout(30)).UseSnakeCaseNamingConvention();
             });
             builder.Services.AddDbContextPool<DialogReadDbContext>(options =>
             {
                 var connStr = builder.Configuration.GetConnectionString("postgres_replica");
-                options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
+                options.UseNpgsql(connStr!, o => o.CommandTimeout(5)).UseSnakeCaseNamingConvention();
             });
             var corsOrigins = builder.Configuration["CORS:AllowedOrigins"]?.Split(",", StringSplitOptions.RemoveEmptyEntries) ?? ["http://localhost:3000"];
             builder.Services.AddCors(o => o.AddPolicy("Frontend", p =>

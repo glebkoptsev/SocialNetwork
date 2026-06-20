@@ -114,12 +114,12 @@ namespace UserService.API
             builder.Services.AddDbContextPool<UserDbContext>(options =>
             {
                 var connStr = builder.Configuration.GetConnectionString("postgres");
-                options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
+                options.UseNpgsql(connStr!, o => o.CommandTimeout(30)).UseSnakeCaseNamingConvention();
             });
             builder.Services.AddDbContextPool<UserReadDbContext>(options =>
             {
                 var connStr = builder.Configuration.GetConnectionString("postgres_replica");
-                options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
+                options.UseNpgsql(connStr!, o => o.CommandTimeout(5)).UseSnakeCaseNamingConvention();
             });
             builder.Services.AddTransient<UsersService>();
             builder.Services.AddTransient<IFriendService, FriendService>();
