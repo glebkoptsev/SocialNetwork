@@ -28,7 +28,8 @@ namespace UserService.API.DTOs
                 Text = post.Text,
                 Creation_datetime = post.Creation_datetime,
                 AuthorFirstName = post.AuthorFirstName,
-                AuthorSecondName = post.AuthorSecondName
+                AuthorSecondName = post.AuthorSecondName,
+                Like_count = post.LikeCount
             };
         }
     }

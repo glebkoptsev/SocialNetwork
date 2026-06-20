@@ -85,7 +85,8 @@ namespace UserService.Database
                     Text = p.Text,
                     Creation_datetime = p.Creation_datetime,
                     AuthorFirstName = u.First_name,
-                    AuthorSecondName = u.Second_name
+                    AuthorSecondName = u.Second_name,
+                    LikeCount = p.LikeCount
                 })
                 .FirstOrDefaultAsync();
             return post;
@@ -103,7 +104,8 @@ namespace UserService.Database
                                 Text = p.Text,
                                 Creation_datetime = p.Creation_datetime,
                                 AuthorFirstName = u.First_name,
-                                AuthorSecondName = u.Second_name
+                                AuthorSecondName = u.Second_name,
+                    LikeCount = p.LikeCount
                             };
 
             return await userPosts
@@ -126,7 +128,8 @@ namespace UserService.Database
                                   Text = p.Text,
                                   Creation_datetime = p.Creation_datetime,
                                   AuthorFirstName = u.First_name,
-                                  AuthorSecondName = u.Second_name
+                                  AuthorSecondName = u.Second_name,
+                    LikeCount = p.LikeCount
                               };
 
             var ownPosts = from p in readDb.Posts
@@ -139,7 +142,8 @@ namespace UserService.Database
                                Text = p.Text,
                                Creation_datetime = p.Creation_datetime,
                                AuthorFirstName = u.First_name,
-                               AuthorSecondName = u.Second_name
+                               AuthorSecondName = u.Second_name,
+                    LikeCount = p.LikeCount
                            };
 
             var posts = await friendPosts
@@ -150,6 +154,32 @@ namespace UserService.Database
                 .ToListAsync();
 
             return posts;
+        }
+
+        public async Task<(bool Liked, int LikeCount)> ToggleLikeAsync(Guid post_id, Guid user_id)
+        {
+            await using var tx = await writeDb.Database.BeginTransactionAsync();
+            var existing = await writeDb.Likes.FirstOrDefaultAsync(l => l.Post_id == post_id && l.User_id == user_id);
+            if (existing is not null)
+            {
+                writeDb.Likes.Remove(existing);
+                await writeDb.Posts.Where(p => p.Post_id == post_id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.LikeCount, p => p.LikeCount - 1));
+                await writeDb.SaveChangesAsync();
+                await tx.CommitAsync();
+                var count = await writeDb.Posts.Where(p => p.Post_id == post_id).Select(p => p.LikeCount).FirstOrDefaultAsync();
+                return (false, count);
+            }
+            else
+            {
+                writeDb.Likes.Add(new LikeEntity { Post_id = post_id, User_id = user_id, Created_at = DateTime.UtcNow });
+                await writeDb.Posts.Where(p => p.Post_id == post_id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.LikeCount, p => p.LikeCount + 1));
+                await writeDb.SaveChangesAsync();
+                await tx.CommitAsync();
+                var count = await writeDb.Posts.Where(p => p.Post_id == post_id).Select(p => p.LikeCount).FirstOrDefaultAsync();
+                return (true, count);
+            }
         }
     }
 }

@@ -59,5 +59,13 @@ namespace UserService.API.Controllers
             await postService.UpdatePostAsync(post_id, request.Text, currentUserId);
             return Ok();
         }
+
+        [HttpPost, Route("{post_id}/like"), Authorize]
+        public async Task<ActionResult<object>> ToggleLike(Guid post_id)
+        {
+            var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
+            var (liked, count) = await postService.ToggleLikeAsync(post_id, currentUserId);
+            return Ok(new { liked, like_count = count });
+        }
     }
 }

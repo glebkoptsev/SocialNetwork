@@ -45,6 +45,11 @@ namespace UserService.API.Services
             await postRepo.DeletePostAsync(post_id, user_id, outboxEntry);
         }
 
+        public async Task<(bool Liked, int Count)> ToggleLikeAsync(Guid post_id, Guid user_id)
+        {
+            return await postRepo.ToggleLikeAsync(post_id, user_id);
+        }
+
         public async Task<Post?> GetPostAsync(Guid post_id)
         {
             try

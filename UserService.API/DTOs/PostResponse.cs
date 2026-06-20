@@ -8,5 +8,6 @@ namespace UserService.API.DTOs
         public DateTime Creation_datetime { get; set; }
         public string? AuthorFirstName { get; set; }
         public string? AuthorSecondName { get; set; }
+        public int Like_count { get; set; }
     }
 }

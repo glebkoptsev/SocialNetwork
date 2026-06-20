@@ -36,18 +36,43 @@ test.describe('SocialNetwork E2E', () => {
       document.cookie.split('; ').find(r => r.startsWith('token='))?.split('=')[1]
     )
 
-    // Retry loop: pipeline (Outbox→RabbitMQ→Worker→Redis) may take a moment
+    // Retry loop: pipeline may take a moment
     let found = false
+    let postId = ''
     for (let i = 0; i < 10; i++) {
       const feedRes = await request.get('http://localhost:5000/api/post/feed?limit=50', {
         headers: { Authorization: `Bearer ${token}` }
       })
       const posts = await feedRes.json()
-      found = posts.some((p: any) => p.text === postText)
-      if (found) break
+      const p = posts.find((p: any) => p.text === postText)
+      if (p) { found = true; postId = p.post_id; break }
       await new Promise(r => setTimeout(r, 1000))
     }
     expect(found).toBeTruthy()
+
+    // Like toggle test
+    let likeRes = await request.post(`http://localhost:5000/api/post/${postId}/like`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    let like = await likeRes.json()
+    expect(like.liked).toBe(true)
+    expect(like.like_count).toBe(1)
+
+    // Toggle off
+    likeRes = await request.post(`http://localhost:5000/api/post/${postId}/like`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    like = await likeRes.json()
+    expect(like.liked).toBe(false)
+    expect(like.like_count).toBe(0)
+
+    // Verify like_count via feed
+    const feedAgain = await request.get('http://localhost:5000/api/post/feed?limit=50', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    const postsAgain = await feedAgain.json()
+    const updatedPost = postsAgain.find((p: any) => p.post_id === postId)
+    expect(updatedPost.like_count).toBe(0)
   })
 
   test('chat: create personal chat and send message', async ({ page }) => {

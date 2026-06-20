@@ -9,6 +9,7 @@ namespace UserService.Database
         public DbSet<FriendEntity> Friends => Set<FriendEntity>();
         public DbSet<Post> Posts => Set<Post>();
         public DbSet<FeedOutboxEntity> FeedOutbox => Set<FeedOutboxEntity>();
+        public DbSet<LikeEntity> Likes => Set<LikeEntity>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -53,6 +54,7 @@ namespace UserService.Database
                 e.HasKey(p => p.Post_id);
                 e.Property(p => p.Text).HasColumnName("post").HasMaxLength(2000);
                 e.Property(p => p.Creation_datetime).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                e.Property(p => p.LikeCount).HasDefaultValue(0);
                 e.HasIndex(p => p.User_id).HasDatabaseName("posts_userid_idx");
                 e.HasIndex(p => new { p.User_id, p.Creation_datetime })
                     .HasDatabaseName("posts_userid_created_idx")
@@ -68,6 +70,14 @@ namespace UserService.Database
                 e.Property(o => o.Id).ValueGeneratedOnAdd();
                 e.Property(o => o.Created_at).HasDefaultValueSql("NOW()");
                 e.HasIndex(o => o.Processed_at).HasDatabaseName("feed_outbox_processed_idx");
+            });
+
+            modelBuilder.Entity<LikeEntity>(e =>
+            {
+                e.ToTable("likes");
+                e.HasKey(l => new { l.Post_id, l.User_id });
+                e.Property(l => l.Created_at).HasDefaultValueSql("NOW()");
+                e.HasIndex(l => l.Post_id).HasDatabaseName("likes_postid_idx");
             });
         }
     }

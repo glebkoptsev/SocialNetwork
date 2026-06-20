@@ -16,6 +16,7 @@ export interface Post {
   creation_datetime: string
   authorFirstName?: string
   authorSecondName?: string
+  like_count: number
 }
 
 export interface Chat {

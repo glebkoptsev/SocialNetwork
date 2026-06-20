@@ -20,5 +20,8 @@ namespace UserService.Database.Entities
 
         [JsonPropertyName("authorSecondName")]
         public string? AuthorSecondName { get; set; }
+
+        [JsonPropertyName("like_count")]
+        public int LikeCount { get; set; }
     }
 }
