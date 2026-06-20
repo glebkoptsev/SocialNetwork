@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DialogService.Database
 {
-    public class DialogDbContext(DbContextOptions<DialogDbContext> options) : DbContext(options)
+    public class DialogDbContext(DbContextOptions options) : DbContext(options)
     {
         public DbSet<Chat> Chats => Set<Chat>();
         public DbSet<ChatUser> ChatUsers => Set<ChatUser>();

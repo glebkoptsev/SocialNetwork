@@ -10,7 +10,8 @@ using System.Text.Json;
 namespace DialogService.API.Services
 {
     public class DatabaseChatService(
-        DialogDbContext db,
+        DialogDbContext writeDb,
+        DialogReadDbContext readDb,
         IConnectionMultiplexer redis,
         IDistributedLock distributedLock,
         UserServiceClient userService) : IChatService
@@ -34,10 +35,10 @@ namespace DialogService.API.Services
                 Creation_datetime = now,
                 Last_update_datetime = now
             };
-            db.Chats.Add(chat);
+            writeDb.Chats.Add(chat);
             foreach (var uid in request.Users_ids)
-                db.ChatUsers.Add(new ChatUser { Chat_id = chatId, User_id = uid, Creation_datetime = now });
-            await db.SaveChangesAsync();
+                writeDb.ChatUsers.Add(new ChatUser { Chat_id = chatId, User_id = uid, Creation_datetime = now });
+            await writeDb.SaveChangesAsync();
 
             await CacheChatAsync(chatId, chat, request.Users_ids, [], now);
             return chatId;
@@ -77,12 +78,12 @@ namespace DialogService.API.Services
                 return existingChatId;
 
             // Check PostgreSQL for existing personal chat
-            var both = await db.ChatUsers.Where(cu => cu.User_id == minId).Select(cu => cu.Chat_id)
-                .Intersect(db.ChatUsers.Where(cu => cu.User_id == maxId).Select(cu => cu.Chat_id))
+            var both = await readDb.ChatUsers.Where(cu => cu.User_id == minId).Select(cu => cu.Chat_id)
+                .Intersect(readDb.ChatUsers.Where(cu => cu.User_id == maxId).Select(cu => cu.Chat_id))
                 .ToListAsync();
             foreach (var cid in both)
             {
-                var userCount = await db.ChatUsers.CountAsync(cu => cu.Chat_id == cid);
+                var userCount = await readDb.ChatUsers.CountAsync(cu => cu.Chat_id == cid);
                 if (userCount == 2)
                 {
                     await cache.StringSetAsync(personalKey, cid.ToString());
@@ -101,10 +102,10 @@ namespace DialogService.API.Services
                 Creation_datetime = now,
                 Last_update_datetime = now
             };
-            db.Chats.Add(chat);
-            db.ChatUsers.Add(new ChatUser { Chat_id = chatId, User_id = currentUserId, Creation_datetime = now });
-            db.ChatUsers.Add(new ChatUser { Chat_id = chatId, User_id = targetUserId, Creation_datetime = now });
-            await db.SaveChangesAsync();
+            writeDb.Chats.Add(chat);
+            writeDb.ChatUsers.Add(new ChatUser { Chat_id = chatId, User_id = currentUserId, Creation_datetime = now });
+            writeDb.ChatUsers.Add(new ChatUser { Chat_id = chatId, User_id = targetUserId, Creation_datetime = now });
+            await writeDb.SaveChangesAsync();
 
             await cache.StringSetAsync(personalKey, chatId.ToString());
             await CacheChatAsync(chatId, chat, [currentUserId, targetUserId], [], now);
@@ -123,14 +124,14 @@ namespace DialogService.API.Services
 
             if (chat is null)
             {
-                var chatEntity = await db.Chats.FirstOrDefaultAsync(c => c.Chat_id == chat_id);
+                var chatEntity = await readDb.Chats.FirstOrDefaultAsync(c => c.Chat_id == chat_id);
                 if (chatEntity is null) return [];
 
-                var userIds = await db.ChatUsers.Where(cu => cu.Chat_id == chat_id).Select(cu => cu.User_id).ToListAsync();
+                var userIds = await readDb.ChatUsers.Where(cu => cu.Chat_id == chat_id).Select(cu => cu.User_id).ToListAsync();
                 if (!userIds.Contains(user_id))
                     throw new UnauthorizedAccessException("User is not a member of this chat");
 
-                var messages = await db.Messages.Where(m => m.Chat_id == chat_id)
+                var messages = await readDb.Messages.Where(m => m.Chat_id == chat_id)
                     .OrderBy(m => m.Creation_datetime).ToListAsync();
 
                 chat = new RedisChat
@@ -166,7 +167,7 @@ namespace DialogService.API.Services
             }
             if (changed)
             {
-                await db.Messages.Where(m => m.Chat_id == chat_id && m.User_id != user_id && m.Status < 1)
+                await writeDb.Messages.Where(m => m.Chat_id == chat_id && m.User_id != user_id && m.Status < 1)
                     .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, 1));
                 await cache.StringSetAsync(cacheKey, JsonSerializer.Serialize(chat, jsonOptions), CacheTtl);
             }
@@ -196,8 +197,8 @@ namespace DialogService.API.Services
 
             if (userChats is null)
             {
-                var chatIds = await db.ChatUsers.Where(cu => cu.User_id == user_id).Select(cu => cu.Chat_id).ToListAsync();
-                var chats = await db.Chats.Where(c => chatIds.Contains(c.Chat_id))
+                var chatIds = await readDb.ChatUsers.Where(cu => cu.User_id == user_id).Select(cu => cu.Chat_id).ToListAsync();
+                var chats = await readDb.Chats.Where(c => chatIds.Contains(c.Chat_id))
                     .OrderByDescending(c => c.Creation_datetime).ToListAsync();
 
                 userChats = new RedisUserChats { User_id = user_id, Chats = chats };
@@ -222,7 +223,7 @@ namespace DialogService.API.Services
             var senderUser = await userService.GetUserAsync(creator_id);
             var senderName = senderUser?.First_name ?? "Unknown";
 
-            var isMember = await db.ChatUsers.AnyAsync(cu => cu.Chat_id == chat_id && cu.User_id == creator_id);
+            var isMember = await readDb.ChatUsers.AnyAsync(cu => cu.Chat_id == chat_id && cu.User_id == creator_id);
             if (!isMember)
                 throw new UnauthorizedAccessException("User is not a member of this chat");
 
@@ -236,8 +237,8 @@ namespace DialogService.API.Services
                 Creation_datetime = now,
                 Status = 0
             };
-            db.Messages.Add(msg);
-            await db.SaveChangesAsync();
+            writeDb.Messages.Add(msg);
+            await writeDb.SaveChangesAsync();
 
             // Update Redis cache
             var cache = redis.GetDatabase(0);
@@ -265,11 +266,11 @@ namespace DialogService.API.Services
 
         public async Task MarkChatAsReadAsync(Guid chat_id, Guid user_id)
         {
-            var isMember = await db.ChatUsers.AnyAsync(cu => cu.Chat_id == chat_id && cu.User_id == user_id);
+            var isMember = await readDb.ChatUsers.AnyAsync(cu => cu.Chat_id == chat_id && cu.User_id == user_id);
             if (!isMember)
                 throw new UnauthorizedAccessException("User is not a member of this chat");
 
-            await db.Messages.Where(m => m.Chat_id == chat_id && m.User_id != user_id && m.Status < 2)
+            await writeDb.Messages.Where(m => m.Chat_id == chat_id && m.User_id != user_id && m.Status < 2)
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, 2));
 
             // Update Redis cache
