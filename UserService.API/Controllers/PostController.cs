@@ -32,7 +32,7 @@ namespace UserService.API.Controllers
             else
             {
                 var currentUserId = Guid.Parse(User.Claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value);
-                posts = await postService.GetFeedAsync(currentUserId, offset, limit);
+                posts = await postService.GetFeedAsync(currentUserId, currentUserId, offset, limit);
             }
             return Ok(posts.Select(p => p.ToResponse()).ToArray());
         }

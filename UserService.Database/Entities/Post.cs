@@ -23,5 +23,8 @@ namespace UserService.Database.Entities
 
         [JsonPropertyName("like_count")]
         public int LikeCount { get; set; }
+
+        [JsonIgnore]
+        public bool HasLiked { get; set; }
     }
 }

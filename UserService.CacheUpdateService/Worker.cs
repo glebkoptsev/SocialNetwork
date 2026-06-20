@@ -290,7 +290,7 @@ namespace UserService.CacheUpdateService
 
             using var scope = scopeFactory.CreateScope();
             var postRepo = scope.ServiceProvider.GetRequiredService<IPostRepository>();
-            var feedFromDb = await postRepo.GetFeedAsync(user_id, 0, 1000);
+            var feedFromDb = await postRepo.GetFeedAsync(user_id, null, 0, 1000);
             await cache.SetStringAsync(key, JsonSerializer.Serialize(feedFromDb, jsonOptions), CacheTtl, ct);
         }
 
@@ -310,7 +310,7 @@ namespace UserService.CacheUpdateService
                 using var scope = scopeFactory.CreateScope();
                 var postRepo = scope.ServiceProvider.GetRequiredService<IPostRepository>();
                 var userId = Guid.Parse(key.AsSpan(5));
-                cachedFeed = await postRepo.GetFeedAsync(userId, 0, 1000);
+                cachedFeed = await postRepo.GetFeedAsync(userId, null, 0, 1000);
             }
             else
             {

@@ -29,7 +29,8 @@ namespace UserService.API.DTOs
                 Creation_datetime = post.Creation_datetime,
                 AuthorFirstName = post.AuthorFirstName,
                 AuthorSecondName = post.AuthorSecondName,
-                Like_count = post.LikeCount
+                Like_count = post.LikeCount,
+                Liked_by_me = post.HasLiked
             };
         }
     }

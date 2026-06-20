@@ -115,7 +115,7 @@ namespace UserService.Database
                 .ToListAsync();
         }
 
-        public async Task<List<Post>> GetFeedAsync(Guid user_id, int offset, int limit)
+        public async Task<List<Post>> GetFeedAsync(Guid user_id, Guid? currentUserId, int offset, int limit)
         {
             var friendPosts = from f in readDb.Friends
                               join p in readDb.Posts on f.Friend_id equals p.User_id
@@ -152,6 +152,17 @@ namespace UserService.Database
                 .Skip(offset)
                 .Take(limit)
                 .ToListAsync();
+
+            if (currentUserId.HasValue)
+            {
+                var postIds = posts.Select(p => p.Post_id).ToList();
+                var likedIds = await readDb.Likes
+                    .Where(l => l.User_id == currentUserId.Value && postIds.Contains(l.Post_id))
+                    .Select(l => l.Post_id)
+                    .ToListAsync();
+                foreach (var p in posts)
+                    p.HasLiked = likedIds.Contains(p.Post_id);
+            }
 
             return posts;
         }

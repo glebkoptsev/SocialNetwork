@@ -61,6 +61,7 @@ namespace UserService.Database
                     .HasMethod("btree");
                 e.Ignore(p => p.AuthorFirstName);
                 e.Ignore(p => p.AuthorSecondName);
+                e.Ignore(p => p.HasLiked);
             });
 
             modelBuilder.Entity<FeedOutboxEntity>(e =>

@@ -74,7 +74,7 @@ namespace UserService.API.Services
             }
         }
 
-        public async Task<IEnumerable<Post>> GetFeedAsync(Guid user_id, int offset, int limit)
+        public async Task<IEnumerable<Post>> GetFeedAsync(Guid user_id, Guid? currentUserId, int offset, int limit)
         {
             string key = $"feed-{user_id}";
             List<Post>? cachedFeed = null;
@@ -99,7 +99,7 @@ namespace UserService.API.Services
 
             try
             {
-                return await postRepo.GetFeedAsync(user_id, offset, limit);
+                return await postRepo.GetFeedAsync(user_id, currentUserId, offset, limit);
             }
             catch (NpgsqlException)
             {

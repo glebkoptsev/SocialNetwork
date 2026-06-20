@@ -9,5 +9,6 @@ namespace UserService.API.DTOs
         public string? AuthorFirstName { get; set; }
         public string? AuthorSecondName { get; set; }
         public int Like_count { get; set; }
+        public bool Liked_by_me { get; set; }
     }
 }

@@ -17,6 +17,7 @@ export interface Post {
   authorFirstName?: string
   authorSecondName?: string
   like_count: number
+  liked_by_me?: boolean
 }
 
 export interface Chat {
