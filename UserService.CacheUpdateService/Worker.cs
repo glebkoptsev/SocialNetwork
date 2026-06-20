@@ -266,7 +266,7 @@ namespace UserService.CacheUpdateService
             return 0;
         }
 
-        private static async Task NotifyFollowerAsync(HubConnection connection, Guid followerId, string message, CancellationToken ct)
+        private async Task NotifyFollowerAsync(HubConnection connection, Guid followerId, string message, CancellationToken ct)
         {
             try
             {

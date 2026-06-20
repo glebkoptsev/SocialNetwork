@@ -59,7 +59,6 @@ namespace UserService.API
             });
 
             builder.Services.AddAuthorization();
-            builder.Services.AddSignalR();
             builder.Services.AddRateLimiter(o =>
             {
                 o.AddFixedWindowLimiter("LoginPolicy", c =>
@@ -146,7 +145,6 @@ namespace UserService.API
             app.UseRateLimiter();
             app.UseMiddleware<ActiveUserMiddleware>();
             app.MapControllers();
-            app.MapHub<FeedHub>("/post/feed/posted");
 
             // Apply migrations and seed system user
             using (var scope = app.Services.CreateScope())
