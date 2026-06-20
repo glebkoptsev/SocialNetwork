@@ -23,6 +23,11 @@ namespace UserService.CacheUpdateService
                         var connStr = hostContext.Configuration.GetConnectionString("postgres");
                         options.UseNpgsql(connStr!).UseSnakeCaseNamingConvention();
                     });
+                    services.AddDbContextFactory<UserReadDbContext>(options =>
+                    {
+                        var connStr = hostContext.Configuration.GetConnectionString("postgres_replica");
+                        options.UseNpgsql(connStr!, o => o.CommandTimeout(5)).UseSnakeCaseNamingConvention();
+                    });
                     services.AddTransient<IFeedOutboxStore, FeedOutboxStore>();
                     services.AddTransient<IPostRepository, PostRepository>();
                     services.AddSingleton<IConnectionMultiplexer>(_ =>

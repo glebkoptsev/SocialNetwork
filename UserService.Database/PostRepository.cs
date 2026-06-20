@@ -78,7 +78,7 @@ namespace UserService.Database
         {
             var post = await writeDb.Posts
                 .Where(p => p.Post_id == post_id)
-                .Join(readDb.Users, p => p.User_id, u => u.User_id, (p, u) => new Post
+                .Join(writeDb.Users, p => p.User_id, u => u.User_id, (p, u) => new Post
                 {
                     Post_id = p.Post_id,
                     User_id = p.User_id,

@@ -1,5 +1,6 @@
 ﻿using Libraries.Web.Common.DTOs;
 using Microsoft.Extensions.Caching.Distributed;
+using Npgsql;
 using System.Text.Json;
 using UserService.Database;
 using UserService.Database.Entities;
@@ -46,26 +47,59 @@ namespace UserService.API.Services
 
         public async Task<Post?> GetPostAsync(Guid post_id)
         {
-            return await postRepo.GetPostAsync(post_id);
+            try
+            {
+                return await postRepo.GetPostAsync(post_id);
+            }
+            catch (NpgsqlException)
+            {
+                return null;
+            }
         }
 
         public async Task<IEnumerable<Post>> GetUserPostsAsync(Guid author_id, int offset, int limit)
         {
-            return await postRepo.GetUserPostsAsync(author_id, offset, limit);
+            try
+            {
+                return await postRepo.GetUserPostsAsync(author_id, offset, limit);
+            }
+            catch (NpgsqlException)
+            {
+                return [];
+            }
         }
 
         public async Task<IEnumerable<Post>> GetFeedAsync(Guid user_id, int offset, int limit)
         {
             string key = $"feed-{user_id}";
             List<Post>? cachedFeed = null;
-            var cachedFeedJson = await distributedCache.GetStringAsync(key);
-            if (cachedFeedJson != null)
+            try
             {
-                cachedFeed = JsonSerializer.Deserialize<List<Post>>(cachedFeedJson, Consts.JsonSerializerOptions);
+                var cachedFeedJson = await distributedCache.GetStringAsync(key);
+                if (cachedFeedJson != null)
+                    cachedFeed = JsonSerializer.Deserialize<List<Post>>(cachedFeedJson, Consts.JsonSerializerOptions);
             }
-            return cachedFeed != null && cachedFeed.Count >= offset + limit
-                ? cachedFeed.OrderByDescending(f => f.Creation_datetime).Skip(offset).Take(limit)
-                : await postRepo.GetFeedAsync(user_id, offset, limit);
+            catch
+            {
+                // Redis недоступен
+            }
+
+            if (cachedFeed != null)
+            {
+                if (cachedFeed.Count >= offset + limit)
+                    return cachedFeed.OrderByDescending(f => f.Creation_datetime).Skip(offset).Take(limit);
+                // Cache miss for pagination — отдаём что есть, не лезем в PG
+                return cachedFeed.OrderByDescending(f => f.Creation_datetime).Skip(offset).Take(cachedFeed.Count - offset > 0 ? limit : 0);
+            }
+
+            try
+            {
+                return await postRepo.GetFeedAsync(user_id, offset, limit);
+            }
+            catch (NpgsqlException)
+            {
+                return [];
+            }
         }
     }
 }

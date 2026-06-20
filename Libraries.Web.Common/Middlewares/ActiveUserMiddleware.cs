@@ -16,9 +16,16 @@ namespace Libraries.Web.Common.Middlewares
         {
             if (context.User.Identity?.IsAuthenticated == true)
             {
-                var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-                if (userId is not null)
-                    await cache.SetStringAsync($"active:{userId}", "1", CacheTtl);
+                try
+                {
+                    var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+                    if (userId is not null)
+                        await cache.SetStringAsync($"active:{userId}", "1", CacheTtl);
+                }
+                catch
+                {
+                    // Redis недоступен — не фатал
+                }
             }
 
             await _next(context);
